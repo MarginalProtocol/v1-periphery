@@ -1,0 +1,15 @@
+# Ape stuff
+.build/
+.cache/
+.coverage
+
+# Python
+.env
+.venv
+.pytest_cache
+.hypothesis
+__pycache__
+
+# node
+node_modules
+*.lock

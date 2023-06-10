@@ -1,0 +1,32 @@
+name: v1-periphery
+
+plugins:
+  - name: solidity
+  - name: foundry
+    version: 0.6.8
+
+default_ecosystem: ethereum
+
+ethereum:
+  default_network: local
+  local:
+    default_provider: foundry
+
+dependencies:
+  - name: openzeppelin
+    github: OpenZeppelin/openzeppelin-contracts
+    version: 4.8.3
+  - name: uniswap-v3-core
+    github: Uniswap/v3-core
+    ref: 0.8
+  - name: uniswap-v3-periphery
+    github: Uniswap/v3-periphery
+    ref: 0.8
+
+solidity:
+  runs: 200
+  via_ir: true
+  import_remapping:
+    - "@openzeppelin/contracts=openzeppelin/v4.8.3"
+    - "@uniswap/v3-core/contracts=uniswap-v3-core/v0.8"
+    - "@uniswap/v3-periphery/contracts=uniswap-v3-periphery/v0.8"
