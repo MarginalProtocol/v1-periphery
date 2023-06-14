@@ -1,4 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+/*
+ * @title SwapRouter
+ * @author Uniswap Labs
+ *
+ * @dev Fork of Uniswap V3 periphery SwapRouter for swaps on Marginal V1 pools.
+ */
 pragma solidity =0.8.15;
 pragma abicoder v2;
 
@@ -18,8 +24,6 @@ import {PoolAddress} from "./libraries/PoolAddress.sol";
 import {CallbackValidation} from "./libraries/CallbackValidation.sol";
 import {Path} from "./libraries/Path.sol";
 
-/// @title Marginal V1 Swap Router
-/// @dev Fork of Uniswap V3 periphery router for swaps on Marginal V1 pools
 contract SwapRouter is
     ISwapRouter,
     PeripheryImmutableState,
