@@ -77,14 +77,14 @@ contract SwapRouter is
         SwapCallbackData memory data = abi.decode(_data, (SwapCallbackData));
         (address tokenIn, address tokenOut, uint24 maintenance) = data
             .path
-            .decodeFirstPool(); // TODO: fix
+            .decodeFirstPool();
         CallbackValidation.verifyCallback(
             deployer,
             factory,
             tokenIn,
             tokenOut,
             maintenance
-        ); // TODO: fix
+        );
 
         (bool isExactInput, uint256 amountToPay) = amount0Delta > 0
             ? (tokenIn < tokenOut, uint256(amount0Delta))
