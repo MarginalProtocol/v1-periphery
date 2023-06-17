@@ -22,7 +22,7 @@ abstract contract PositionManagement is
         PoolAddress.PoolKey poolKey;
         address payer;
     }
-    struct AdjustParams {
+    struct AdjustPositionParams {
         address token0;
         address token1;
         uint24 maintenance;
@@ -30,7 +30,7 @@ abstract contract PositionManagement is
         uint104 id;
         int128 marginDelta;
     }
-    struct OpenParams {
+    struct OpenPositionParams {
         address token0;
         address token1;
         uint24 maintenance;
@@ -41,7 +41,7 @@ abstract contract PositionManagement is
         uint128 margin;
         uint256 sizeMinimum;
     }
-    struct SettleParams {
+    struct SettlePositionParams {
         address token0;
         address token1;
         uint24 maintenance;
@@ -63,9 +63,9 @@ abstract contract PositionManagement is
 
     /// @notice Opens a new position on pool
     // TODO: test
-    function open(
-        OpenParams memory params
-    ) internal returns (uint256 id, IMarginalV1Pool pool) {
+    function openPosition(
+        OpenPositionParams memory params
+    ) internal returns (uint256 id, uint256 size, IMarginalV1Pool pool) {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
@@ -73,7 +73,6 @@ abstract contract PositionManagement is
         });
         pool = getPool(poolKey);
 
-        uint256 size;
         (id, size) = pool.open(
             params.recipient,
             params.zeroForOne,
@@ -106,8 +105,8 @@ abstract contract PositionManagement is
 
     /// @notice Adjusts margin backing position on pool
     // TODO: test
-    function adjust(
-        AdjustParams memory params
+    function adjustPosition(
+        AdjustPositionParams memory params
     )
         internal
         returns (uint256 margin0, uint256 margin1, IMarginalV1Pool pool)
@@ -148,8 +147,8 @@ abstract contract PositionManagement is
 
     /// @notice Settles a position on pool
     // TODO: test
-    function settle(
-        SettleParams memory params
+    function settlePosition(
+        SettlePositionParams memory params
     ) internal returns (int256 amount0, int256 amount1, IMarginalV1Pool pool) {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
