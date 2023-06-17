@@ -22,15 +22,20 @@ abstract contract PositionManagement is
         PoolAddress.PoolKey poolKey;
         address payer;
     }
-    struct AdjustPositionParams {
-        address token0;
-        address token1;
-        uint24 maintenance;
-        address recipient;
-        uint104 id;
-        int128 marginDelta;
+
+    error SizeLessThanMin(uint256 size);
+
+    /// @dev Returns the pool for the given token pair and maintenance. The pool contract may or may not exist.
+    function getPool(
+        PoolAddress.PoolKey memory poolKey
+    ) internal view returns (IMarginalV1Pool) {
+        return
+            IMarginalV1Pool(
+                PoolAddress.computeAddress(deployer, factory, poolKey)
+            );
     }
-    struct OpenPositionParams {
+
+    struct OpenParams {
         address token0;
         address token1;
         uint24 maintenance;
@@ -41,30 +46,11 @@ abstract contract PositionManagement is
         uint128 margin;
         uint256 sizeMinimum;
     }
-    struct SettlePositionParams {
-        address token0;
-        address token1;
-        uint24 maintenance;
-        address recipient;
-        uint104 id;
-    }
-
-    error SizeLessThanMin(uint256 size);
-
-    /// @dev Returns the pool for the given token pair and maintenance. The pool contract may or may not exist.
-    function getPool(
-        PoolAddress.PoolKey memory poolKey
-    ) private view returns (IMarginalV1Pool) {
-        return
-            IMarginalV1Pool(
-                PoolAddress.computeAddress(deployer, factory, poolKey)
-            );
-    }
 
     /// @notice Opens a new position on pool
     // TODO: test
-    function openPosition(
-        OpenPositionParams memory params
+    function open(
+        OpenParams memory params
     ) internal returns (uint256 id, uint256 size, IMarginalV1Pool pool) {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
@@ -103,20 +89,26 @@ abstract contract PositionManagement is
             pay(decoded.poolKey.token1, decoded.payer, msg.sender, amount1Owed);
     }
 
+    struct AdjustParams {
+        address token0;
+        address token1;
+        uint24 maintenance;
+        address recipient;
+        uint104 id;
+        int128 marginDelta;
+    }
+
     /// @notice Adjusts margin backing position on pool
     // TODO: test
-    function adjustPosition(
-        AdjustPositionParams memory params
-    )
-        internal
-        returns (uint256 margin0, uint256 margin1, IMarginalV1Pool pool)
-    {
+    function adjust(
+        AdjustParams memory params
+    ) internal returns (uint256 margin0, uint256 margin1) {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
             maintenance: params.maintenance
         });
-        pool = getPool(poolKey);
+        IMarginalV1Pool pool = getPool(poolKey);
 
         (margin0, margin1) = pool.adjust(
             params.recipient,
@@ -145,17 +137,25 @@ abstract contract PositionManagement is
             pay(decoded.poolKey.token1, decoded.payer, msg.sender, amount1Owed);
     }
 
+    struct SettleParams {
+        address token0;
+        address token1;
+        uint24 maintenance;
+        address recipient;
+        uint104 id;
+    }
+
     /// @notice Settles a position on pool
     // TODO: test
-    function settlePosition(
-        SettlePositionParams memory params
-    ) internal returns (int256 amount0, int256 amount1, IMarginalV1Pool pool) {
+    function settle(
+        SettleParams memory params
+    ) internal returns (int256 amount0, int256 amount1) {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
             maintenance: params.maintenance
         });
-        pool = getPool(poolKey);
+        IMarginalV1Pool pool = getPool(poolKey);
 
         (amount0, amount1) = pool.settle(
             params.recipient,
