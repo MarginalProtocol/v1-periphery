@@ -7,6 +7,8 @@ import "./PoolAddress.sol";
 /// @notice Provides validation for callbacks from Marginal V1 Pools
 /// @dev Fork of Uniswap V3 periphery CallbackValidation.sol
 library CallbackValidation {
+    error PoolNotSender();
+
     /// @notice Returns the address of a valid Marginal V1 Pool
     /// @param deployer The contract address of the Marginal V1 deployer
     /// @param factory The contract address of the Marginal V1 factory
@@ -42,6 +44,6 @@ library CallbackValidation {
         pool = IMarginalV1Pool(
             PoolAddress.computeAddress(deployer, factory, poolKey)
         );
-        require(msg.sender == address(pool));
+        if (msg.sender != address(pool)) revert PoolNotSender();
     }
 }
