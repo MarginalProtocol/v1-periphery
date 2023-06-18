@@ -7,6 +7,27 @@ import {IPeripheryImmutableState} from "./IPeripheryImmutableState.sol";
 import {IPeripheryPayments} from "./IPeripheryPayments.sol";
 
 interface INonfungiblePositionManager is IERC721 {
+    function positions(
+        uint256 tokenId
+    )
+        external
+        view
+        returns (
+            address pool,
+            uint96 positionId,
+            uint128 size,
+            uint128 debt0,
+            uint128 debt1,
+            uint128 insurance0,
+            uint128 insurance1,
+            bool zeroForOne,
+            bool liquidated,
+            int56 tick,
+            int56 tickCumulativeDelta,
+            uint128 margin,
+            uint128 rewards
+        );
+
     struct MintParams {
         address token0;
         address token1;

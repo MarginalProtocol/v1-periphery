@@ -51,6 +51,49 @@ contract NonfungiblePositionManager is
         PeripheryImmutableState(_factory, _WETH9)
     {}
 
+    // TODO: check for re-entrancy view issues and warn @dev if so
+    // TODO: test
+    function positions(
+        uint256 tokenId
+    )
+        external
+        view
+        returns (
+            address pool,
+            uint96 positionId,
+            uint128 size,
+            uint128 debt0,
+            uint128 debt1,
+            uint128 insurance0,
+            uint128 insurance1,
+            bool zeroForOne,
+            bool liquidated,
+            int56 tick,
+            int56 tickCumulativeDelta,
+            uint128 margin,
+            uint128 rewards
+        )
+    {
+        Position memory position = _positions[tokenId];
+        pool = position.pool;
+        positionId = position.id;
+
+        bytes32 key = keccak256(abi.encodePacked(address(this), positionId));
+        (
+            size,
+            debt0,
+            debt1,
+            insurance0,
+            insurance1,
+            zeroForOne,
+            liquidated,
+            tick,
+            tickCumulativeDelta,
+            margin,
+            rewards
+        ) = IMarginalV1Pool(pool).positions(key);
+    }
+
     /// @notice Mints a new position, opening on pool
     // TODO: test
     function mint(
