@@ -13,8 +13,8 @@ import {PositionManagement} from "./base/PositionManagement.sol";
 import {INonfungiblePositionManager} from "./interfaces/INonfungiblePositionManager.sol";
 import {PoolAddress} from "./libraries/PoolAddress.sol";
 
-// TODO: INonfungiblePositionManager
 contract NonfungiblePositionManager is
+    INonfungiblePositionManager,
     Multicall,
     ERC721,
     PeripheryImmutableState,
@@ -51,20 +51,8 @@ contract NonfungiblePositionManager is
         PeripheryImmutableState(_factory, _WETH9)
     {}
 
-    struct MintParams {
-        address token0;
-        address token1;
-        uint24 maintenance;
-        bool zeroForOne;
-        uint128 liquidityDelta;
-        uint160 sqrtPriceLimitX96;
-        uint128 margin;
-        uint256 sizeMinimum;
-        address recipient;
-        uint256 deadline;
-    }
-
     /// @notice Mints a new position, opening on pool
+    // TODO: test
     function mint(
         MintParams calldata params
     )
@@ -99,17 +87,8 @@ contract NonfungiblePositionManager is
         emit Mint(tokenId, size);
     }
 
-    struct LockParams {
-        address token0;
-        address token1;
-        uint24 maintenance;
-        uint256 tokenId;
-        uint128 marginIn;
-        address recipient;
-        uint256 deadline;
-    }
-
     /// @dev Adds margin to an existing position
+    // TODO: test
     function lock(
         LockParams calldata params
     )
@@ -147,21 +126,13 @@ contract NonfungiblePositionManager is
         emit Lock(params.tokenId, margin);
     }
 
-    struct FreeParams {
-        address token0;
-        address token1;
-        uint24 maintenance;
-        uint256 tokenId;
-        uint128 marginOut;
-        address recipient;
-        uint256 deadline;
-    }
-
     /// @notice Removes margin from an existing position
+    // TODO: test
     function free(
         FreeParams calldata params
     )
         external
+        payable
         onlyApprovedOrOwner(params.tokenId)
         checkDeadline(params.deadline)
         returns (uint256 margin)
@@ -194,20 +165,13 @@ contract NonfungiblePositionManager is
         emit Free(params.tokenId, margin);
     }
 
-    struct BurnParams {
-        address token0;
-        address token1;
-        uint24 maintenance;
-        uint256 tokenId;
-        address recipient;
-        uint256 deadline;
-    }
-
     /// @notice Burns an existing position, settling on pool
+    // TODO: test
     function burn(
         BurnParams calldata params
     )
         external
+        payable
         onlyApprovedOrOwner(params.tokenId)
         checkDeadline(params.deadline)
         returns (uint256 amountIn, uint256 amountOut)
@@ -248,18 +212,16 @@ contract NonfungiblePositionManager is
         emit Burn(params.tokenId, amountIn, amountOut);
     }
 
-    struct GrabParams {
-        address token0;
-        address token1;
-        uint24 maintenance;
-        uint256 tokenId;
-        address recipient;
-        uint256 deadline;
-    }
-
+    /// @notice Grabs an existing position, liquidating on pool
+    // TODO: test
     function grab(
         GrabParams calldata params
-    ) external checkDeadline(params.deadline) returns (uint256 rewards) {
+    )
+        external
+        payable
+        checkDeadline(params.deadline)
+        returns (uint256 rewards)
+    {
         Position memory position = _positions[params.tokenId];
         if (
             address(
