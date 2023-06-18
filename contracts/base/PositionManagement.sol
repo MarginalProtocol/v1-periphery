@@ -94,7 +94,7 @@ abstract contract PositionManagement is
         address token1;
         uint24 maintenance;
         address recipient;
-        uint104 id;
+        uint96 id;
         int128 marginDelta;
     }
 
@@ -142,7 +142,7 @@ abstract contract PositionManagement is
         address token1;
         uint24 maintenance;
         address recipient;
-        uint104 id;
+        uint96 id;
     }
 
     /// @notice Settles a position on pool

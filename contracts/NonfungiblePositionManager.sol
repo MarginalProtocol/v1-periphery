@@ -23,7 +23,7 @@ contract NonfungiblePositionManager is
 {
     struct Position {
         address pool;
-        uint96 id; // TODO: change on v1 core and add initialized bool for packing
+        uint96 id;
     }
     mapping(uint256 => Position) private _positions;
 
@@ -103,7 +103,7 @@ contract NonfungiblePositionManager is
 
         _positions[tokenId] = Position({
             pool: address(pool),
-            id: uint96(positionId) // TODO: change from 104 to 96 on v1 core
+            id: uint96(positionId)
         });
 
         cachePoolKey(
