@@ -193,4 +193,32 @@ abstract contract PositionManagement is
                 uint256(amount1Delta)
             );
     }
+
+    struct LiquidateParams {
+        address token0;
+        address token1;
+        uint24 maintenance;
+        address recipient;
+        address owner;
+        uint96 id;
+    }
+
+    /// @notice Liquidates a position on pool
+    // TODO: test
+    function liquidate(
+        LiquidateParams memory params
+    ) internal returns (uint256 rewards0, uint256 rewards1) {
+        PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
+            token0: params.token0,
+            token1: params.token1,
+            maintenance: params.maintenance
+        });
+        IMarginalV1Pool pool = getPool(poolKey);
+
+        (rewards0, rewards1) = pool.liquidate(
+            params.recipient,
+            params.owner,
+            params.id
+        );
+    }
 }

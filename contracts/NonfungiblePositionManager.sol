@@ -27,8 +27,6 @@ contract NonfungiblePositionManager is
     }
     mapping(uint256 => Position) private _positions;
 
-    mapping(address => PoolAddress.PoolKey) private _pools;
-
     uint256 private _nextId = 1;
 
     modifier onlyApprovedOrOwner(uint256 tokenId) {
@@ -40,6 +38,7 @@ contract NonfungiblePositionManager is
     event Lock(uint256 indexed tokenId, uint256 marginAfter);
     event Free(uint256 indexed tokenId, uint256 marginAfter);
     event Burn(uint256 indexed tokenId, uint256 amountIn, uint256 amountOut);
+    event Grab(uint256 indexed tokenId, uint256 rewards);
 
     error Unauthorized();
     error InvalidPoolKey();
@@ -51,15 +50,6 @@ contract NonfungiblePositionManager is
         ERC721("Marginal V1 Position Token", "MRGLV1-POS")
         PeripheryImmutableState(_factory, _WETH9)
     {}
-
-    function cachePoolKey(
-        address pool,
-        PoolAddress.PoolKey memory poolKey
-    ) private {
-        if (_pools[pool].token0 == address(0)) {
-            _pools[pool] = poolKey;
-        }
-    }
 
     struct MintParams {
         address token0;
@@ -105,15 +95,6 @@ contract NonfungiblePositionManager is
             pool: address(pool),
             id: uint96(positionId)
         });
-
-        cachePoolKey(
-            address(pool),
-            PoolAddress.PoolKey({
-                token0: params.token0,
-                token1: params.token1,
-                maintenance: params.maintenance
-            })
-        );
 
         emit Mint(tokenId, size);
     }
@@ -265,5 +246,45 @@ contract NonfungiblePositionManager is
         _burn(params.tokenId);
 
         emit Burn(params.tokenId, amountIn, amountOut);
+    }
+
+    struct GrabParams {
+        address token0;
+        address token1;
+        uint24 maintenance;
+        uint256 tokenId;
+        address recipient;
+        uint256 deadline;
+    }
+
+    function grab(
+        GrabParams calldata params
+    ) external checkDeadline(params.deadline) returns (uint256 rewards) {
+        Position memory position = _positions[params.tokenId];
+        if (
+            address(
+                getPool(
+                    PoolAddress.PoolKey({
+                        token0: params.token0,
+                        token1: params.token1,
+                        maintenance: params.maintenance
+                    })
+                )
+            ) != position.pool
+        ) revert InvalidPoolKey();
+
+        (uint256 rewards0, uint256 rewards1) = liquidate(
+            LiquidateParams({
+                token0: params.token0,
+                token1: params.token1,
+                maintenance: params.maintenance,
+                recipient: params.recipient,
+                owner: address(this),
+                id: position.id
+            })
+        );
+        rewards = rewards0 > 0 ? rewards0 : rewards1;
+
+        emit Grab(params.tokenId, rewards);
     }
 }
