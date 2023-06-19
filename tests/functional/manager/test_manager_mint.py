@@ -122,9 +122,57 @@ def test_manager_mint__mints_token(
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
 def test_manager_mint__sets_position_ref(
-    pool_initialized_with_liquidity, manager, zero_for_one, sender
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    position_lib,
+    sqrt_price_math_lib,
+    rando_univ3_observations,
+    chain,
 ):
-    pass
+    state = pool_initialized_with_liquidity.state()
+    maintenance = pool_initialized_with_liquidity.maintenance()
+
+    sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
+    liquidity_delta = (state.liquidity * 5) // 100  # 5% borrowed for 1% size
+    (amount0, amount1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        liquidity_delta, state.sqrtPriceX96
+    )
+    amount = amount1 if zero_for_one else amount0
+
+    size = int(
+        (amount * maintenance)
+        // (maintenance + MAINTENANCE_UNIT - liquidity_delta / state.liquidity)
+    )
+    margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
+    size_min = (size * 80) // 100
+    deadline = chain.pending_timestamp + 3600
+
+    mint_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        maintenance,
+        zero_for_one,
+        liquidity_delta,
+        sqrt_price_limit_x96,
+        margin,
+        size_min,
+        sender.address,
+        deadline,
+    )
+    manager.mint(mint_params, sender=sender)
+
+    position_id = state.totalPositions
+    owner = manager.address
+    key = get_position_key(owner, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+    next_id = 1
+    assert manager.positions(next_id) == (
+        pool_initialized_with_liquidity.address,
+        position_id,
+        *position,
+    )
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
