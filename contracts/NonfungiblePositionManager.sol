@@ -52,7 +52,6 @@ contract NonfungiblePositionManager is
     {}
 
     // TODO: check for re-entrancy view issues and warn @dev if so
-    // TODO: test
     function positions(
         uint256 tokenId
     )
@@ -95,7 +94,6 @@ contract NonfungiblePositionManager is
     }
 
     /// @notice Mints a new position, opening on pool
-    // TODO: test
     function mint(
         MintParams calldata params
     )
