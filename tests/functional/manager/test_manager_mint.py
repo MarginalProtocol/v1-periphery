@@ -2,11 +2,14 @@ import pytest
 
 from ape import reverts
 
-from utils.constants import MIN_SQRT_RATIO, MAX_SQRT_RATIO, MAINTENANCE_UNIT, REWARD
+from utils.constants import (
+    MIN_SQRT_RATIO,
+    MAX_SQRT_RATIO,
+    MAINTENANCE_UNIT,
+    FEE,
+    REWARD,
+)
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
-
-
-# TODO: transfers funds
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
@@ -174,6 +177,68 @@ def test_manager_mint__sets_position_ref(
         pool_initialized_with_liquidity.address,
         position_id,
         *position,
+    )
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_mint__transfers_funds(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    chain,
+    token0,
+    token1,
+    position_lib,
+):
+    state = pool_initialized_with_liquidity.state()
+    maintenance = pool_initialized_with_liquidity.maintenance()
+
+    sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
+    liquidity_delta = (state.liquidity * 5) // 100  # 5% borrowed for 1% size
+    (amount0, amount1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        liquidity_delta, state.sqrtPriceX96
+    )
+    amount = amount1 if zero_for_one else amount0
+
+    size = int(
+        (amount * maintenance)
+        // (maintenance + MAINTENANCE_UNIT - liquidity_delta / state.liquidity)
+    )
+    margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
+    size_min = (size * 80) // 100
+    deadline = chain.pending_timestamp + 3600
+
+    token = token1 if zero_for_one else token0
+    balance_sender = token.balanceOf(sender.address)
+    balance_pool = token.balanceOf(pool_initialized_with_liquidity.address)
+
+    mint_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        maintenance,
+        zero_for_one,
+        liquidity_delta,
+        sqrt_price_limit_x96,
+        margin,
+        size_min,
+        sender.address,
+        deadline,
+    )
+    manager.mint(mint_params, sender=sender)
+
+    position_id = state.totalPositions
+    owner = manager.address
+    key = get_position_key(owner, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+
+    fees = position_lib.fees(position.size, FEE)
+    amount_in = position.margin + position.rewards + fees
+
+    assert token.balanceOf(sender.address) == balance_sender - amount_in
+    assert (
+        token.balanceOf(pool_initialized_with_liquidity.address)
+        == balance_pool + amount_in
     )
 
 

@@ -9,9 +9,6 @@ from utils.constants import (
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
 
 
-# TODO: transfers funds
-
-
 @pytest.fixture
 def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
     def mint(zero_for_one: bool) -> int:
@@ -99,6 +96,17 @@ def test_lock__adjusts_position(
         position_id,
         *position,
     )
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_lock__transfers_funds(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    chain,
+):
+    pass
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
