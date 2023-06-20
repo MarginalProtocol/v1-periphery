@@ -6,6 +6,9 @@ from utils.constants import MIN_SQRT_RATIO, MAX_SQRT_RATIO, MAINTENANCE_UNIT, RE
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
 
 
+# TODO: transfers funds
+
+
 @pytest.mark.parametrize("zero_for_one", [True, False])
 def test_manager_mint__opens_position(
     pool_initialized_with_liquidity,
