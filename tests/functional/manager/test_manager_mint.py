@@ -60,7 +60,7 @@ def test_manager_mint__opens_position(
         oracle_tick_cumulative,
     )
     position.margin = margin
-    position.rewards = position_lib.liquidationRewards(position.size, REWARD)
+    position.liquidityLocked = liquidity_delta
 
     mint_params = (
         pool_initialized_with_liquidity.token0(),
@@ -233,7 +233,8 @@ def test_manager_mint__transfers_funds(
     position = pool_initialized_with_liquidity.positions(key)
 
     fees = position_lib.fees(position.size, FEE)
-    amount_in = position.margin + position.rewards + fees
+    rewards = position_lib.liquidationRewards(position.size, REWARD)
+    amount_in = position.margin + rewards + fees
 
     assert token.balanceOf(sender.address) == balance_sender - amount_in
     assert (

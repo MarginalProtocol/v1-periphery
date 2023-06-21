@@ -57,11 +57,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
     }
     State public state;
 
-    struct ReservesLocked {
-        uint128 token0;
-        uint128 token1;
-    }
-    ReservesLocked public reservesLocked;
+    uint128 public liquidityLocked;
 
     struct ProtocolFees {
         uint128 token0;
@@ -203,7 +199,6 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         return IERC20(token1).balanceOf(address(this));
     }
 
-    // TODO: support uni v4 hooks?
     function oracleTickCumulatives(
         uint32[] memory secondsAgos
     ) private view returns (int56[] memory) {
@@ -268,19 +263,19 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             _state.tickCumulative,
             oracleTickCumulative
         );
-        if (zeroForOne ? position.debt0 == 0 : position.debt1 == 0)
-            revert InvalidPosition(); // TODO: test
+        if (
+            position.size == 0 ||
+            (zeroForOne ? position.debt0 == 0 : position.debt1 == 0)
+        ) revert InvalidPosition(); // TODO: test
 
         uint128 marginMinimum = position.marginMinimum(maintenance);
         if (margin < marginMinimum) revert MarginLessThanMin(marginMinimum);
+        position.margin = margin;
 
         _state.liquidity -= liquidityDelta;
         _state.sqrtPriceX96 = sqrtPriceX96Next;
 
-        (uint128 amount0Locked, uint128 amount1Locked) = position
-            .amountsLocked();
-        reservesLocked.token0 += amount0Locked;
-        reservesLocked.token1 += amount1Locked;
+        liquidityLocked += liquidityDelta;
 
         // callback for margin amount
         if (!zeroForOne) {
@@ -300,9 +295,6 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             );
             if (balance0Before + amount0 > balance0())
                 revert Amount0LessThanMin();
-
-            position.margin = margin;
-            position.rewards = uint128(rewards0);
 
             // account for protocol fees if fee on
             if (_state.feeProtocol > 0) {
@@ -339,9 +331,6 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             );
             if (balance1Before + amount1 > balance1())
                 revert Amount1LessThanMin();
-
-            position.margin = margin;
-            position.rewards = uint128(rewards1);
 
             // account for protocol fees if fee on
             if (_state.feeProtocol > 0) {
@@ -422,6 +411,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             );
             if (balance0Before + margin0 > balance0())
                 revert Amount0LessThanMin();
+
             position.margin = margin0.toUint128();
         } else {
             margin1 = uint256(
@@ -437,6 +427,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             );
             if (balance1Before + margin1 > balance1())
                 revert Amount1LessThanMin();
+
             position.margin = margin1.toUint128();
         }
 
@@ -467,17 +458,18 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             fundingPeriod
         );
 
+        liquidityLocked -= position.liquidityLocked;
         (uint128 amount0Unlocked, uint128 amount1Unlocked) = position
             .amountsLocked();
-        reservesLocked.token0 -= amount0Unlocked;
-        reservesLocked.token1 -= amount1Unlocked;
 
         // flash size + margin + rewards out then callback for debt owed in
         if (!position.zeroForOne) {
+            uint256 rewards0 = Position.liquidationRewards(
+                position.size,
+                reward
+            );
             amount0 = -int256(
-                uint256(position.size) +
-                    uint256(position.margin) +
-                    uint256(position.rewards)
+                uint256(position.size) + uint256(position.margin) + rewards0
             ); // size + margin + rewards out
             amount1 = int256(uint256(position.debt1)); // debt in
 
@@ -492,7 +484,11 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
                 .liquiditySqrtPriceX96Next(
                     _state.liquidity,
                     _state.sqrtPriceX96,
-                    int256(uint256(amount0Unlocked - position.size)), // insurance0 + debt0
+                    int256(
+                        uint256(
+                            amount0Unlocked - position.size - position.margin
+                        )
+                    ), // insurance0 + debt0
                     int256(uint256(amount1Unlocked)) + amount1 // insurance1 + debt1
                 );
             _state.liquidity = liquidityNext;
@@ -508,11 +504,14 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             if (balance1Before + uint256(amount1) > balance1())
                 revert Amount1LessThanMin();
         } else {
+            uint256 rewards1 = Position.liquidationRewards(
+                position.size,
+                reward
+            );
+
             amount0 = int256(uint256(position.debt0)); // debt in
             amount1 = -int256(
-                uint256(position.size) +
-                    uint256(position.margin) +
-                    uint256(position.rewards)
+                uint256(position.size) + uint256(position.margin) + rewards1
             ); // size + margin + rewards out
 
             if (amount1 < 0)
@@ -527,7 +526,11 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
                     _state.liquidity,
                     _state.sqrtPriceX96,
                     int256(uint256(amount0Unlocked)) + amount0, // insurance0 + debt0
-                    int256(uint256(amount1Unlocked - position.size)) // insurance1 + debt1
+                    int256(
+                        uint256(
+                            amount1Unlocked - position.size - position.margin
+                        )
+                    ) // insurance1 + debt1
                 );
             _state.liquidity = liquidityNext;
             _state.sqrtPriceX96 = sqrtPriceX96Next;
@@ -591,16 +594,13 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         if (position.safe(oracleSqrtPriceX96, maintenance))
             revert PositionSafe();
 
+        liquidityLocked -= position.liquidityLocked;
         (uint128 amount0, uint128 amount1) = position.amountsLocked();
-        reservesLocked.token0 -= amount0;
-        reservesLocked.token1 -= amount1;
 
         if (!position.zeroForOne) {
-            rewards0 = uint256(position.rewards);
-            amount0 += position.margin;
+            rewards0 = Position.liquidationRewards(position.size, reward);
         } else {
-            rewards1 = uint256(position.rewards);
-            amount1 += position.margin;
+            rewards1 = Position.liquidationRewards(position.size, reward);
         }
 
         (_state.liquidity, _state.sqrtPriceX96) = LiquidityMath
@@ -776,14 +776,11 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             _state.sqrtPriceX96
         );
 
-        // total liquidity is available liquidity if all locked reserves were returned to pool
-        (uint128 totalLiquidityAfter, ) = LiquidityMath
-            .liquiditySqrtPriceX96Next(
-                _state.liquidity,
-                _state.sqrtPriceX96,
-                int256(uint256(reservesLocked.token0 + amount0)),
-                int256(uint256(reservesLocked.token1 + amount1))
-            );
+        // total liquidity is available liquidity if all locked liquidity was returned to pool
+        // TODO: verify no edge cases where _totalSupply == 0 but totalLiquidityAfter == liquidityDelta?
+        uint128 totalLiquidityAfter = _state.liquidity +
+            liquidityLocked +
+            liquidityDelta;
         uint256 shares = _totalSupply == 0
             ? totalLiquidityAfter
             : Math.mulDiv(
@@ -823,18 +820,12 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         uint256 _totalSupply = totalSupply();
         if (shares == 0 || shares > _totalSupply) revert InvalidShares();
 
-        // total liquidity is available liquidity if all locked reserves were returned to pool
-        (uint256 totalLiquidityBefore, ) = LiquidityMath
-            .liquiditySqrtPriceX96Next(
-                _state.liquidity,
-                _state.sqrtPriceX96,
-                int256(uint256(reservesLocked.token0)),
-                int256(uint256(reservesLocked.token1))
-            );
+        // total liquidity is available liquidity if all locked liquidity were returned to pool
+        uint128 totalLiquidityBefore = _state.liquidity + liquidityLocked;
         uint128 liquidityDelta = uint128(
             Math.mulDiv(totalLiquidityBefore, shares, _totalSupply)
         );
-        if (liquidityDelta >= _state.liquidity) revert InvalidLiquidityDelta();
+        if (liquidityDelta > _state.liquidity) revert InvalidLiquidityDelta();
 
         (amount0, amount1) = LiquidityMath.toAmounts(
             liquidityDelta,
