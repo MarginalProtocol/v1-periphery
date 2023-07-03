@@ -1,5 +1,7 @@
 import pytest
 
+from ape import reverts
+
 from utils.constants import (
     MIN_SQRT_RATIO,
     MAX_SQRT_RATIO,
@@ -104,9 +106,44 @@ def test_lock__transfers_funds(
     manager,
     zero_for_one,
     sender,
+    alice,
     chain,
+    token0,
+    token1,
+    mint_position,
 ):
-    pass
+    token_id = mint_position(zero_for_one)
+
+    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
+    key = get_position_key(manager.address, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+
+    token = token0 if not zero_for_one else token1
+    balance_alice = token.balanceOf(alice.address)
+    balance_sender = token.balanceOf(sender.address)
+    balance_pool = token.balanceOf(pool_initialized_with_liquidity.address)
+
+    deadline = chain.pending_timestamp + 3600
+    margin_in = (position.margin * 25) // 100
+    lock_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        margin_in,
+        alice.address,
+        deadline,
+    )
+    manager.lock(lock_params, sender=sender)
+
+    assert token.balanceOf(alice.address) == balance_alice + position.margin
+    assert token.balanceOf(sender.address) == balance_sender - (
+        position.margin + margin_in
+    )
+    assert (
+        token.balanceOf(pool_initialized_with_liquidity.address)
+        == balance_pool + margin_in
+    )
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
@@ -115,11 +152,43 @@ def test_lock__emits_lock(
     manager,
     zero_for_one,
     sender,
+    alice,
     chain,
+    mint_position,
 ):
-    pass
+    token_id = mint_position(zero_for_one)
+
+    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
+    key = get_position_key(manager.address, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+
+    deadline = chain.pending_timestamp + 3600
+    margin_in = (position.margin * 25) // 100
+    lock_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        margin_in,
+        alice.address,
+        deadline,
+    )
+    tx = manager.lock(lock_params, sender=sender)
+
+    # refresh position state
+    position = pool_initialized_with_liquidity.positions(key)
+
+    next_id = 1
+    events = tx.decode_logs(manager.Lock)
+    assert len(events) == 1
+
+    event = events[0]
+    assert event.tokenId == next_id
+    assert event.marginAfter == position.margin
+    assert tx.return_value == position.margin
 
 
+# TODO: new pool with weth9
 @pytest.mark.parametrize("zero_for_one", [True, False])
 def test_lock__deposits_weth(
     pool_initialized_with_liquidity,
@@ -137,9 +206,30 @@ def test_lock__reverts_when_not_owner(
     manager,
     zero_for_one,
     sender,
+    alice,
     chain,
+    mint_position,
 ):
-    pass
+    token_id = mint_position(zero_for_one)
+
+    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
+    key = get_position_key(manager.address, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+
+    deadline = chain.pending_timestamp + 3600
+    margin_in = (position.margin * 25) // 100
+    lock_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        margin_in,
+        alice.address,
+        deadline,
+    )
+
+    with reverts(manager.Unauthorized):
+        manager.lock(lock_params, sender=alice)
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
@@ -148,9 +238,30 @@ def test_lock__reverts_when_past_deadline(
     manager,
     zero_for_one,
     sender,
+    alice,
     chain,
+    mint_position,
 ):
-    pass
+    token_id = mint_position(zero_for_one)
+
+    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
+    key = get_position_key(manager.address, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+
+    deadline = chain.pending_timestamp - 1
+    margin_in = (position.margin * 25) // 100
+    lock_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        margin_in,
+        alice.address,
+        deadline,
+    )
+
+    with reverts("Transaction too old"):
+        manager.lock(lock_params, sender=sender)
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
@@ -159,6 +270,28 @@ def test_lock__reverts_when_invalid_pool_key(
     manager,
     zero_for_one,
     sender,
+    alice,
     chain,
+    mint_position,
+    rando_token_a_address,
 ):
-    pass
+    token_id = mint_position(zero_for_one)
+
+    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
+    key = get_position_key(manager.address, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+
+    deadline = chain.pending_timestamp + 3600
+    margin_in = (position.margin * 25) // 100
+    lock_params = (
+        rando_token_a_address,
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        margin_in,
+        alice.address,
+        deadline,
+    )
+
+    with reverts(manager.InvalidPoolKey):
+        manager.lock(lock_params, sender=sender)

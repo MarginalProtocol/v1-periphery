@@ -128,8 +128,7 @@ contract NonfungiblePositionManager is
         emit Mint(tokenId, size);
     }
 
-    /// @dev Adds margin to an existing position
-    // TODO: test
+    /// @notice Adds margin to an existing position
     function lock(
         LockParams calldata params
     )
