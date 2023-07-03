@@ -70,7 +70,7 @@ contract NonfungiblePositionManager is
             int56 tick,
             int56 tickCumulativeDelta,
             uint128 margin,
-            uint128 rewards
+            uint128 liquidityLocked
         )
     {
         Position memory position = _positions[tokenId];
@@ -89,7 +89,7 @@ contract NonfungiblePositionManager is
             tick,
             tickCumulativeDelta,
             margin,
-            rewards
+            liquidityLocked
         ) = IMarginalV1Pool(pool).positions(key);
     }
 
@@ -167,7 +167,6 @@ contract NonfungiblePositionManager is
     }
 
     /// @notice Removes margin from an existing position
-    // TODO: test
     function free(
         FreeParams calldata params
     )

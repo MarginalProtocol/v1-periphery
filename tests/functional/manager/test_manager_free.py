@@ -1,0 +1,294 @@
+import pytest
+
+from ape import reverts
+
+from utils.constants import (
+    MIN_SQRT_RATIO,
+    MAX_SQRT_RATIO,
+    MAINTENANCE_UNIT,
+    FUNDING_PERIOD,
+)
+from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
+
+
+@pytest.fixture
+def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
+    def mint(zero_for_one: bool) -> int:
+        state = pool_initialized_with_liquidity.state()
+        maintenance = pool_initialized_with_liquidity.maintenance()
+
+        sqrt_price_limit_x96 = (
+            MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
+        )
+        liquidity_delta = (state.liquidity * 5) // 100  # 5% borrowed for 1% size
+        (amount0, amount1) = calc_amounts_from_liquidity_sqrt_price_x96(
+            liquidity_delta, state.sqrtPriceX96
+        )
+        amount = amount1 if zero_for_one else amount0
+
+        size = int(
+            (amount * maintenance)
+            // (maintenance + MAINTENANCE_UNIT - liquidity_delta / state.liquidity)
+        )
+        margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
+        size_min = (size * 80) // 100
+        deadline = chain.pending_timestamp + 3600
+
+        mint_params = (
+            pool_initialized_with_liquidity.token0(),
+            pool_initialized_with_liquidity.token1(),
+            maintenance,
+            zero_for_one,
+            liquidity_delta,
+            sqrt_price_limit_x96,
+            margin,
+            size_min,
+            sender.address,
+            deadline,
+        )
+        tx = manager.mint(mint_params, sender=sender)
+        token_id, _ = tx.return_value
+        return int(token_id)
+
+    yield mint
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_free__adjusts_position(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    mock_univ3_pool,
+    position_lib,
+    mint_position,
+):
+    token_id = mint_position(zero_for_one)
+
+    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
+    key = get_position_key(manager.address, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+
+    deadline = chain.pending_timestamp + 3600
+    margin_out = (position.margin * 5) // 100
+    free_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        margin_out,
+        alice.address,
+        deadline,
+    )
+    manager.free(free_params, sender=sender)
+
+    state = pool_initialized_with_liquidity.state()
+    tick_cumulative_last = state.tickCumulative
+    oracle_tick_cumulatives, _ = mock_univ3_pool.observe([0])
+    position = position_lib.sync(
+        position, tick_cumulative_last, oracle_tick_cumulatives[0], FUNDING_PERIOD
+    )
+
+    position.margin -= margin_out
+    assert pool_initialized_with_liquidity.positions(key) == position
+    assert manager.positions(token_id) == (
+        pool_initialized_with_liquidity.address,
+        position_id,
+        *position,
+    )
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_free__transfers_funds(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    token0,
+    token1,
+    mint_position,
+):
+    token_id = mint_position(zero_for_one)
+
+    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
+    key = get_position_key(manager.address, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+
+    token = token0 if not zero_for_one else token1
+    balance_alice = token.balanceOf(alice.address)
+    balance_sender = token.balanceOf(sender.address)
+    balance_pool = token.balanceOf(pool_initialized_with_liquidity.address)
+
+    deadline = chain.pending_timestamp + 3600
+    margin_out = (position.margin * 5) // 100
+    free_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        margin_out,
+        alice.address,
+        deadline,
+    )
+    manager.free(free_params, sender=sender)
+
+    assert token.balanceOf(alice.address) == balance_alice + position.margin
+    assert token.balanceOf(sender.address) == balance_sender - (
+        position.margin - margin_out
+    )
+    assert (
+        token.balanceOf(pool_initialized_with_liquidity.address)
+        == balance_pool - margin_out
+    )
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_free__emits_free(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    mint_position,
+):
+    token_id = mint_position(zero_for_one)
+
+    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
+    key = get_position_key(manager.address, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+
+    deadline = chain.pending_timestamp + 3600
+    margin_out = (position.margin * 5) // 100
+    free_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        margin_out,
+        alice.address,
+        deadline,
+    )
+    tx = manager.free(free_params, sender=sender)
+
+    # refresh position state
+    position = pool_initialized_with_liquidity.positions(key)
+
+    next_id = 1
+    events = tx.decode_logs(manager.Free)
+    assert len(events) == 1
+
+    event = events[0]
+    assert event.tokenId == next_id
+    assert event.marginAfter == position.margin
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_free__deposits_weth(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    mint_position,
+):
+    pass
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_free__reverts_when_not_owner(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    mint_position,
+):
+    token_id = mint_position(zero_for_one)
+
+    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
+    key = get_position_key(manager.address, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+
+    deadline = chain.pending_timestamp + 3600
+    margin_out = (position.margin * 5) // 100
+    free_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        margin_out,
+        alice.address,
+        deadline,
+    )
+    with reverts(manager.Unauthorized):
+        manager.free(free_params, sender=alice)
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_free__reverts_when_past_deadline(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    mint_position,
+):
+    token_id = mint_position(zero_for_one)
+
+    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
+    key = get_position_key(manager.address, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+
+    deadline = chain.pending_timestamp - 1
+    margin_out = (position.margin * 5) // 100
+    free_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        margin_out,
+        alice.address,
+        deadline,
+    )
+    with reverts("Transaction too old"):
+        manager.free(free_params, sender=sender)
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_free__reverts_when_invalid_pool_key(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    mint_position,
+    rando_token_a_address,
+):
+    token_id = mint_position(zero_for_one)
+
+    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
+    key = get_position_key(manager.address, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+
+    deadline = chain.pending_timestamp + 3600
+    margin_out = (position.margin * 5) // 100
+    free_params = (
+        rando_token_a_address,
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        margin_out,
+        alice.address,
+        deadline,
+    )
+    with reverts(manager.InvalidPoolKey):
+        manager.free(free_params, sender=sender)
