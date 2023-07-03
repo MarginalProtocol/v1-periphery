@@ -25,7 +25,7 @@ interface INonfungiblePositionManager is IERC721 {
             int56 tick,
             int56 tickCumulativeDelta,
             uint128 margin,
-            uint128 rewards
+            uint128 liquidityLocked
         );
 
     struct MintParams {

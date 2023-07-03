@@ -54,7 +54,7 @@ def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_lock__adjusts_position(
+def test_manager_lock__adjusts_position(
     pool_initialized_with_liquidity,
     manager,
     zero_for_one,
@@ -101,7 +101,7 @@ def test_lock__adjusts_position(
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_lock__transfers_funds(
+def test_manager_lock__transfers_funds(
     pool_initialized_with_liquidity,
     manager,
     zero_for_one,
@@ -147,7 +147,7 @@ def test_lock__transfers_funds(
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_lock__emits_lock(
+def test_manager_lock__emits_lock(
     pool_initialized_with_liquidity,
     manager,
     zero_for_one,
@@ -190,7 +190,7 @@ def test_lock__emits_lock(
 
 # TODO: new pool with weth9
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_lock__deposits_weth(
+def test_manager_lock__deposits_weth(
     pool_initialized_with_liquidity,
     manager,
     zero_for_one,
@@ -201,7 +201,7 @@ def test_lock__deposits_weth(
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_lock__reverts_when_not_owner(
+def test_manager_lock__reverts_when_not_owner(
     pool_initialized_with_liquidity,
     manager,
     zero_for_one,
@@ -233,7 +233,7 @@ def test_lock__reverts_when_not_owner(
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_lock__reverts_when_past_deadline(
+def test_manager_lock__reverts_when_past_deadline(
     pool_initialized_with_liquidity,
     manager,
     zero_for_one,
@@ -265,7 +265,7 @@ def test_lock__reverts_when_past_deadline(
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_lock__reverts_when_invalid_pool_key(
+def test_manager_lock__reverts_when_invalid_pool_key(
     pool_initialized_with_liquidity,
     manager,
     zero_for_one,
