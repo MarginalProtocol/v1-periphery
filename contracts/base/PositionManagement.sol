@@ -48,7 +48,6 @@ abstract contract PositionManagement is
     }
 
     /// @notice Opens a new position on pool
-    // TODO: test
     function open(
         OpenParams memory params
     ) internal returns (uint256 id, uint256 size, IMarginalV1Pool pool) {
@@ -99,7 +98,6 @@ abstract contract PositionManagement is
     }
 
     /// @notice Adjusts margin backing position on pool
-    // TODO: test
     function adjust(
         AdjustParams memory params
     ) internal returns (uint256 margin0, uint256 margin1) {
@@ -146,7 +144,6 @@ abstract contract PositionManagement is
     }
 
     /// @notice Settles a position on pool
-    // TODO: test
     function settle(
         SettleParams memory params
     ) internal returns (int256 amount0, int256 amount1) {
@@ -204,7 +201,6 @@ abstract contract PositionManagement is
     }
 
     /// @notice Liquidates a position on pool
-    // TODO: test
     function liquidate(
         LiquidateParams memory params
     ) internal returns (uint256 rewards0, uint256 rewards1) {

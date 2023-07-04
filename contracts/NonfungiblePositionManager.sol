@@ -128,7 +128,7 @@ contract NonfungiblePositionManager is
         emit Mint(tokenId, size);
     }
 
-    /// @notice Adds margin to an existing position
+    /// @notice Adds margin to an existing position, adjusting on pool
     function lock(
         LockParams calldata params
     )
@@ -166,7 +166,7 @@ contract NonfungiblePositionManager is
         emit Lock(params.tokenId, margin);
     }
 
-    /// @notice Removes margin from an existing position
+    /// @notice Removes margin from an existing position, adjusting on pool
     function free(
         FreeParams calldata params
     )
