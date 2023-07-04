@@ -178,13 +178,13 @@ def test_manager_free__emits_free(
     # refresh position state
     position = pool_initialized_with_liquidity.positions(key)
 
-    next_id = 1
     events = tx.decode_logs(manager.Free)
     assert len(events) == 1
 
     event = events[0]
-    assert event.tokenId == next_id
+    assert event.tokenId == token_id
     assert event.marginAfter == position.margin
+    assert tx.return_value == position.margin
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])

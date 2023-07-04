@@ -1,12 +1,14 @@
 import pytest
 
 from ape import reverts
+from ape.utils import ZERO_ADDRESS
 
 from utils.constants import (
     MIN_SQRT_RATIO,
     MAX_SQRT_RATIO,
     MAINTENANCE_UNIT,
     FUNDING_PERIOD,
+    SECONDS_AGO,
 )
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
 
@@ -53,244 +55,215 @@ def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
     yield mint
 
 
+@pytest.fixture
+def get_oracle_next_obs(rando_univ3_observations):
+    def oracle_next_obs(zero_for_one: bool) -> tuple:
+        obs_last = rando_univ3_observations[-1]
+        obs_before = rando_univ3_observations[-2]
+        tick = (obs_last[1] - obs_before[1]) // (obs_last[0] - obs_before[0])
+
+        tick_pc_change = 120 if zero_for_one else 80
+
+        obs_timestamp = obs_last[0] + SECONDS_AGO
+        obs_tick_cumulative = obs_last[1] + (SECONDS_AGO * tick * tick_pc_change) // 100
+        obs_liquidity_cumulative = obs_last[2]  # @dev irrelevant for test
+        obs = (obs_timestamp, obs_tick_cumulative, obs_liquidity_cumulative, True)
+        return obs
+
+    yield oracle_next_obs
+
+
+@pytest.fixture
+def adjust_oracle(mock_univ3_pool, sender, get_oracle_next_obs):
+    def adjust(zero_for_one: bool):
+        obs = get_oracle_next_obs(zero_for_one)
+        mock_univ3_pool.pushObservation(*obs, sender=sender)
+
+    yield adjust
+
+
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_manager_lock__adjusts_position(
+def test_manager_grab__liquidates_position(
     pool_initialized_with_liquidity,
     manager,
     zero_for_one,
-    sender,
     alice,
+    bob,
     chain,
     mock_univ3_pool,
     position_lib,
     mint_position,
+    adjust_oracle,
 ):
     token_id = mint_position(zero_for_one)
+    adjust_oracle(zero_for_one)  # makes position unsafe
 
     position_id = pool_initialized_with_liquidity.state().totalPositions - 1
     key = get_position_key(manager.address, position_id)
     position = pool_initialized_with_liquidity.positions(key)
 
     deadline = chain.pending_timestamp + 3600
-    margin_in = (position.margin * 25) // 100
-    lock_params = (
+    grab_params = (
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
         token_id,
-        margin_in,
         alice.address,
         deadline,
     )
-    manager.lock(lock_params, sender=sender)
+    manager.grab(grab_params, sender=bob)
 
     state = pool_initialized_with_liquidity.state()
     tick_cumulative_last = state.tickCumulative
     oracle_tick_cumulatives, _ = mock_univ3_pool.observe([0])
+
+    # sync then liquidate position
     position = position_lib.sync(
         position, tick_cumulative_last, oracle_tick_cumulatives[0], FUNDING_PERIOD
     )
-
-    position.margin += margin_in
+    position = position_lib.liquidate(position)
     assert pool_initialized_with_liquidity.positions(key) == position
-    assert manager.positions(token_id) == (
-        pool_initialized_with_liquidity.address,
-        position_id,
-        *position,
-    )
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_manager_lock__transfers_funds(
+def test_manager_grab__transfers_funds(
     pool_initialized_with_liquidity,
     manager,
     zero_for_one,
-    sender,
     alice,
+    bob,
     chain,
     token0,
     token1,
+    position_lib,
     mint_position,
+    adjust_oracle,
 ):
     token_id = mint_position(zero_for_one)
+    adjust_oracle(zero_for_one)  # makes position unsafe
 
+    reward = pool_initialized_with_liquidity.reward()
     position_id = pool_initialized_with_liquidity.state().totalPositions - 1
     key = get_position_key(manager.address, position_id)
     position = pool_initialized_with_liquidity.positions(key)
 
-    token = token0 if not zero_for_one else token1
-    balance_alice = token.balanceOf(alice.address)
-    balance_sender = token.balanceOf(sender.address)
-    balance_pool = token.balanceOf(pool_initialized_with_liquidity.address)
+    token_out = token0 if not zero_for_one else token1
+    amount_out = position_lib.liquidationRewards(position.size, reward)
+
+    balance_pool = token_out.balanceOf(pool_initialized_with_liquidity.address)
+    balance_alice = token_out.balanceOf(alice.address)
 
     deadline = chain.pending_timestamp + 3600
-    margin_in = (position.margin * 25) // 100
-    lock_params = (
+    grab_params = (
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
         token_id,
-        margin_in,
         alice.address,
         deadline,
     )
-    manager.lock(lock_params, sender=sender)
+    manager.grab(grab_params, sender=bob)
 
-    assert token.balanceOf(alice.address) == balance_alice + position.margin
-    assert token.balanceOf(sender.address) == balance_sender - (
-        position.margin + margin_in
-    )
+    assert token_out.balanceOf(alice.address) == balance_alice + amount_out
     assert (
-        token.balanceOf(pool_initialized_with_liquidity.address)
-        == balance_pool + margin_in
+        token_out.balanceOf(pool_initialized_with_liquidity.address)
+        == balance_pool - amount_out
     )
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_manager_lock__emits_lock(
+def test_manager_grab__emits_grab(
     pool_initialized_with_liquidity,
     manager,
     zero_for_one,
-    sender,
     alice,
+    bob,
     chain,
+    position_lib,
     mint_position,
+    adjust_oracle,
 ):
     token_id = mint_position(zero_for_one)
+    adjust_oracle(zero_for_one)  # makes position unsafe
 
+    reward = pool_initialized_with_liquidity.reward()
     position_id = pool_initialized_with_liquidity.state().totalPositions - 1
     key = get_position_key(manager.address, position_id)
     position = pool_initialized_with_liquidity.positions(key)
 
+    rewards = position_lib.liquidationRewards(position.size, reward)
+
     deadline = chain.pending_timestamp + 3600
-    margin_in = (position.margin * 25) // 100
-    lock_params = (
+    grab_params = (
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
         token_id,
-        margin_in,
         alice.address,
         deadline,
     )
-    tx = manager.lock(lock_params, sender=sender)
-
-    # refresh position state
-    position = pool_initialized_with_liquidity.positions(key)
-
-    events = tx.decode_logs(manager.Lock)
+    tx = manager.grab(grab_params, sender=bob)
+    events = tx.decode_logs(manager.Grab)
     assert len(events) == 1
 
     event = events[0]
     assert event.tokenId == token_id
-    assert event.marginAfter == position.margin
-    assert tx.return_value == position.margin
-
-
-# TODO: new pool with weth9
-@pytest.mark.parametrize("zero_for_one", [True, False])
-def test_manager_lock__deposits_weth(
-    pool_initialized_with_liquidity,
-    manager,
-    zero_for_one,
-    sender,
-    chain,
-):
-    pass
+    assert event.rewards == rewards
+    assert tx.return_value == rewards
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_manager_lock__reverts_when_not_owner(
+def test_manager_grab__reverts_when_past_deadline(
     pool_initialized_with_liquidity,
     manager,
     zero_for_one,
-    sender,
     alice,
+    bob,
     chain,
     mint_position,
+    adjust_oracle,
 ):
     token_id = mint_position(zero_for_one)
-
-    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
-    key = get_position_key(manager.address, position_id)
-    position = pool_initialized_with_liquidity.positions(key)
-
-    deadline = chain.pending_timestamp + 3600
-    margin_in = (position.margin * 25) // 100
-    lock_params = (
-        pool_initialized_with_liquidity.token0(),
-        pool_initialized_with_liquidity.token1(),
-        pool_initialized_with_liquidity.maintenance(),
-        token_id,
-        margin_in,
-        alice.address,
-        deadline,
-    )
-
-    with reverts(manager.Unauthorized):
-        manager.lock(lock_params, sender=alice)
-
-
-@pytest.mark.parametrize("zero_for_one", [True, False])
-def test_manager_lock__reverts_when_past_deadline(
-    pool_initialized_with_liquidity,
-    manager,
-    zero_for_one,
-    sender,
-    alice,
-    chain,
-    mint_position,
-):
-    token_id = mint_position(zero_for_one)
-
-    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
-    key = get_position_key(manager.address, position_id)
-    position = pool_initialized_with_liquidity.positions(key)
+    adjust_oracle(zero_for_one)  # makes position unsafe
 
     deadline = chain.pending_timestamp - 1
-    margin_in = (position.margin * 25) // 100
-    lock_params = (
+    grab_params = (
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
         token_id,
-        margin_in,
         alice.address,
         deadline,
     )
-
     with reverts("Transaction too old"):
-        manager.lock(lock_params, sender=sender)
+        manager.grab(grab_params, sender=bob)
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_manager_lock__reverts_when_invalid_pool_key(
+def test_manager_grab__reverts_when_invalid_pool_key(
     pool_initialized_with_liquidity,
     manager,
     zero_for_one,
-    sender,
     alice,
+    bob,
     chain,
+    mock_univ3_pool,
+    position_lib,
     mint_position,
+    adjust_oracle,
     rando_token_a_address,
 ):
     token_id = mint_position(zero_for_one)
-
-    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
-    key = get_position_key(manager.address, position_id)
-    position = pool_initialized_with_liquidity.positions(key)
+    adjust_oracle(zero_for_one)  # makes position unsafe
 
     deadline = chain.pending_timestamp + 3600
-    margin_in = (position.margin * 25) // 100
-    lock_params = (
+    grab_params = (
         rando_token_a_address,
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
         token_id,
-        margin_in,
         alice.address,
         deadline,
     )
-
     with reverts(manager.InvalidPoolKey):
-        manager.lock(lock_params, sender=sender)
+        manager.grab(grab_params, sender=bob)
