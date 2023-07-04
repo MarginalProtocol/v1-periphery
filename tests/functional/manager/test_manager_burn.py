@@ -1,6 +1,7 @@
 import pytest
 
 from ape import reverts
+from ape.utils import ZERO_ADDRESS
 
 from utils.constants import (
     MIN_SQRT_RATIO,
@@ -95,40 +96,241 @@ def test_manager_burn__settles_position(
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_manager_burn__transfers_funds(zero_for_one):
-    pass
+def test_manager_burn__transfers_funds(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    token0,
+    token1,
+    position_lib,
+    mint_position,
+):
+    token_id = mint_position(zero_for_one)
+
+    reward = pool_initialized_with_liquidity.reward()
+    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
+    key = get_position_key(manager.address, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+
+    rewards = position_lib.liquidationRewards(position.size, reward)
+
+    token_in = token0 if zero_for_one else token1
+    token_out = token1 if zero_for_one else token0
+
+    amount_in = position.debt0 if zero_for_one else position.debt1
+    amount_out = position.size + position.margin + rewards
+
+    balance_in_sender = token_in.balanceOf(sender.address)
+    balance_in_pool = token_in.balanceOf(pool_initialized_with_liquidity.address)
+
+    balance_out_alice = token_out.balanceOf(alice.address)
+    balance_out_pool = token_out.balanceOf(pool_initialized_with_liquidity.address)
+
+    deadline = chain.pending_timestamp + 3600
+    burn_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        alice.address,
+        deadline,
+    )
+    manager.burn(burn_params, sender=sender)
+
+    assert token_out.balanceOf(alice.address) == balance_out_alice + amount_out
+    assert token_in.balanceOf(sender.address) == balance_in_sender - amount_in
+
+    assert (
+        token_out.balanceOf(pool_initialized_with_liquidity.address)
+        == balance_out_pool - amount_out
+    )
+    assert (
+        token_in.balanceOf(pool_initialized_with_liquidity.address)
+        == balance_in_pool + amount_in
+    )
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_manager_burn__deletes_position(zero_for_one):
-    pass
+def test_manager_burn__deletes_manager_position(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    mint_position,
+):
+    token_id = mint_position(zero_for_one)
+
+    manager_position = manager.positions(token_id)
+    assert manager_position.pool != ZERO_ADDRESS
+
+    deadline = chain.pending_timestamp + 3600
+    burn_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        alice.address,
+        deadline,
+    )
+    manager.burn(burn_params, sender=sender)
+
+    # view should revert since Position struct has ZERO_ADDRESS for pool
+    with reverts():
+        manager.positions(token_id)
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_manager_burn__burns_token(zero_for_one):
-    pass
+def test_manager_burn__burns_token(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    mint_position,
+):
+    token_id = mint_position(zero_for_one)
+    assert manager.ownerOf(token_id) == sender.address
+    assert manager.balanceOf(sender.address) > 0
+
+    deadline = chain.pending_timestamp + 3600
+    burn_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        alice.address,
+        deadline,
+    )
+    manager.burn(burn_params, sender=sender)
+
+    assert manager.balanceOf(sender.address) == 0
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_manager_burn__emits_burn(zero_for_one):
-    pass
+def test_manager_burn__emits_burn(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    position_lib,
+    mint_position,
+):
+    token_id = mint_position(zero_for_one)
+
+    reward = pool_initialized_with_liquidity.reward()
+    position_id = pool_initialized_with_liquidity.state().totalPositions - 1
+    key = get_position_key(manager.address, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+
+    rewards = position_lib.liquidationRewards(position.size, reward)
+    amount_in = position.debt0 if zero_for_one else position.debt1
+    amount_out = position.size + position.margin + rewards
+
+    deadline = chain.pending_timestamp + 3600
+    burn_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        alice.address,
+        deadline,
+    )
+    tx = manager.burn(burn_params, sender=sender)
+    events = tx.decode_logs(manager.Burn)
+    assert len(events) == 1
+
+    event = events[0]
+    assert event.tokenId == token_id
+    assert event.amountIn == amount_in
+    assert event.amountOut == amount_out
+    assert tx.return_value == (amount_in, amount_out)
 
 
+# TODO:
 @pytest.mark.parametrize("zero_for_one", [True, False])
 def test_manager_burn__deposits_weth(zero_for_one):
     pass
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_manager_burn__reverts_when_not_owner(zero_for_one):
-    pass
+def test_manager_burn__reverts_when_not_owner(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    mint_position,
+):
+    token_id = mint_position(zero_for_one)
+
+    deadline = chain.pending_timestamp + 3600
+    burn_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        alice.address,
+        deadline,
+    )
+    with reverts(manager.Unauthorized):
+        manager.burn(burn_params, sender=alice)
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_manager_burn__reverts_when_past_deadline(zero_for_one):
-    pass
+def test_manager_burn__reverts_when_past_deadline(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    mint_position,
+):
+    token_id = mint_position(zero_for_one)
+
+    deadline = chain.pending_timestamp - 1
+    burn_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        alice.address,
+        deadline,
+    )
+    with reverts("Transaction too old"):
+        manager.burn(burn_params, sender=sender)
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_manager_burn__reverts_when_invalid_pool_key(zero_for_one):
-    pass
+def test_manager_burn__reverts_when_invalid_pool_key(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    mint_position,
+    rando_token_a_address,
+):
+    token_id = mint_position(zero_for_one)
+
+    deadline = chain.pending_timestamp + 3600
+    burn_params = (
+        rando_token_a_address,
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        token_id,
+        alice.address,
+        deadline,
+    )
+    with reverts(manager.InvalidPoolKey):
+        manager.burn(burn_params, sender=sender)

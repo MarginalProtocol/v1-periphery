@@ -205,7 +205,6 @@ contract NonfungiblePositionManager is
     }
 
     /// @notice Burns an existing position, settling on pool
-    // TODO: test
     function burn(
         BurnParams calldata params
     )
