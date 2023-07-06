@@ -45,7 +45,7 @@ abstract contract LiquidityManagement is
     /// @notice Mints liquidity on pool
     function mint(
         MintParams memory params
-    ) internal returns (uint256 amount0, uint256 amount1) {
+    ) internal returns (uint256 shares, uint256 amount0, uint256 amount1) {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
@@ -53,7 +53,7 @@ abstract contract LiquidityManagement is
         });
         IMarginalV1Pool pool = getPool(poolKey);
 
-        (amount0, amount1) = pool.mint(
+        (shares, amount0, amount1) = pool.mint(
             params.recipient,
             params.liquidityDelta,
             abi.encode(
@@ -95,7 +95,10 @@ abstract contract LiquidityManagement is
     /// @notice Burns liquidity on pool
     function burn(
         BurnParams memory params
-    ) internal returns (uint256 amount0, uint256 amount1) {
+    )
+        internal
+        returns (uint128 liquidityDelta, uint256 amount0, uint256 amount1)
+    {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
@@ -103,7 +106,10 @@ abstract contract LiquidityManagement is
         });
         IMarginalV1Pool pool = getPool(poolKey);
 
-        (amount0, amount1) = pool.burn(params.recipient, params.shares);
+        (liquidityDelta, amount0, amount1) = pool.burn(
+            params.recipient,
+            params.shares
+        );
 
         if (amount0 < params.amount0Min) revert Amount0LessThanMin(amount0);
         if (amount1 < params.amount1Min) revert Amount1LessThanMin(amount1);

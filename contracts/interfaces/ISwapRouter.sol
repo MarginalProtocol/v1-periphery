@@ -7,11 +7,17 @@ import "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1SwapCallback.
 
 interface ISwapRouter is IMarginalV1MintCallback, IMarginalV1SwapCallback {
     event IncreaseLiquidity(
+        uint256 shares,
         uint128 liquidityDelta,
         uint256 amount0,
         uint256 amount1
     );
-    event DecreaseLiquidity(uint256 shares, uint256 amount0, uint256 amount1);
+    event DecreaseLiquidity(
+        uint256 shares,
+        uint128 liquidityDelta,
+        uint256 amount0,
+        uint256 amount1
+    );
 
     struct ExactInputSingleParams {
         address tokenIn;
@@ -81,11 +87,15 @@ interface ISwapRouter is IMarginalV1MintCallback, IMarginalV1SwapCallback {
 
     /// @notice Adds liquidity, minting on pool
     /// @param params The parameters necessary for adding liquidity, encoded as `AddLiquidityParams` in calldata
+    /// @return shares The amount of shares minted
     /// @return amount0 The amount of the input token0
     /// @return amount1 The amount of the input token1
     function addLiquidity(
         AddLiquidityParams calldata params
-    ) external payable returns (uint256 amount0, uint256 amount1);
+    )
+        external
+        payable
+        returns (uint256 shares, uint256 amount0, uint256 amount1);
 
     struct AddLiquidityParams {
         address token0;
@@ -100,11 +110,15 @@ interface ISwapRouter is IMarginalV1MintCallback, IMarginalV1SwapCallback {
 
     /// @notice Removes liquidity, burning on pool
     /// @param params The parameters necessary for removing liquidity, encoded as `RemoveLiquidityParams` in calldata
+    /// @return liquidityDelta The amount of liquidity removed
     /// @return amount0 The amount of the output token0
     /// @return amount1 The amount of the output token1
     function removeLiquidity(
         RemoveLiquidityParams calldata params
-    ) external payable returns (uint256 amount0, uint256 amount1);
+    )
+        external
+        payable
+        returns (uint128 liquidityDelta, uint256 amount0, uint256 amount1);
 
     struct RemoveLiquidityParams {
         address token0;

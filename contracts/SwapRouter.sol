@@ -312,9 +312,9 @@ contract SwapRouter is
         external
         payable
         checkDeadline(params.deadline)
-        returns (uint256 amount0, uint256 amount1)
+        returns (uint256 shares, uint256 amount0, uint256 amount1)
     {
-        (amount0, amount1) = mint(
+        (shares, amount0, amount1) = mint(
             MintParams({
                 token0: params.token0,
                 token1: params.token1,
@@ -325,7 +325,7 @@ contract SwapRouter is
                 amount1Min: params.amount1Min
             })
         );
-        emit IncreaseLiquidity(params.liquidityDelta, amount0, amount1);
+        emit IncreaseLiquidity(shares, params.liquidityDelta, amount0, amount1);
     }
 
     /// @inheritdoc ISwapRouter
@@ -335,9 +335,9 @@ contract SwapRouter is
         external
         payable
         checkDeadline(params.deadline)
-        returns (uint256 amount0, uint256 amount1)
+        returns (uint128 liquidityDelta, uint256 amount0, uint256 amount1)
     {
-        (amount0, amount1) = burn(
+        (liquidityDelta, amount0, amount1) = burn(
             BurnParams({
                 token0: params.token0,
                 token1: params.token1,
@@ -348,6 +348,6 @@ contract SwapRouter is
                 amount1Min: params.amount1Min
             })
         );
-        emit DecreaseLiquidity(params.shares, amount0, amount1);
+        emit DecreaseLiquidity(params.shares, liquidityDelta, amount0, amount1);
     }
 }

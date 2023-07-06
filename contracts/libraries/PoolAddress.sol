@@ -4,7 +4,7 @@ pragma solidity >=0.5.0;
 /// @dev Fork of Uniswap V3 periphery PoolAddress.sol
 library PoolAddress {
     bytes32 internal constant POOL_INIT_CODE_HASH =
-        0xee40f25b1f38b90fca4568b9e9ca5e90dd463ea57da0a5bb0d7966519557e88b;
+        0x569b626d5a876696665bd521064e2ecf2492e5aa40e39c6261eb5d6ef9a4e146;
 
     /// @notice The identifying key of the pool
     struct PoolKey {
