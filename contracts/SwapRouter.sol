@@ -18,6 +18,7 @@ import {SelfPermit} from "@uniswap/v3-periphery/contracts/base/SelfPermit.sol";
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
 
 import {ISwapRouter} from "./interfaces/ISwapRouter.sol";
+import {LiquidityManagement} from "./base/LiquidityManagement.sol";
 import {PeripheryImmutableState} from "./base/PeripheryImmutableState.sol";
 import {PeripheryPaymentsWithFee} from "./base/PeripheryPaymentsWithFee.sol";
 import {PoolAddress} from "./libraries/PoolAddress.sol";
@@ -27,6 +28,7 @@ import {Path} from "./libraries/Path.sol";
 contract SwapRouter is
     ISwapRouter,
     PeripheryImmutableState,
+    LiquidityManagement,
     PeripheryValidation,
     PeripheryPaymentsWithFee,
     Multicall,
@@ -303,5 +305,49 @@ contract SwapRouter is
         amountInCached = DEFAULT_AMOUNT_IN_CACHED;
     }
 
-    // TODO: add/removeLiquidity, mintCallback
+    /// @inheritdoc ISwapRouter
+    function addLiquidity(
+        AddLiquidityParams calldata params
+    )
+        external
+        payable
+        checkDeadline(params.deadline)
+        returns (uint256 amount0, uint256 amount1)
+    {
+        (amount0, amount1) = mint(
+            MintParams({
+                token0: params.token0,
+                token1: params.token1,
+                maintenance: params.maintenance,
+                recipient: params.recipient,
+                liquidityDelta: params.liquidityDelta,
+                amount0Min: params.amount0Min,
+                amount1Min: params.amount1Min
+            })
+        );
+        emit IncreaseLiquidity(params.liquidityDelta, amount0, amount1);
+    }
+
+    /// @inheritdoc ISwapRouter
+    function removeLiquidity(
+        RemoveLiquidityParams calldata params
+    )
+        external
+        payable
+        checkDeadline(params.deadline)
+        returns (uint256 amount0, uint256 amount1)
+    {
+        (amount0, amount1) = burn(
+            BurnParams({
+                token0: params.token0,
+                token1: params.token1,
+                maintenance: params.maintenance,
+                recipient: params.recipient,
+                shares: params.shares,
+                amount0Min: params.amount0Min,
+                amount1Min: params.amount1Min
+            })
+        );
+        emit DecreaseLiquidity(params.shares, amount0, amount1);
+    }
 }

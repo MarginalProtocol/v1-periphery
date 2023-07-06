@@ -2,10 +2,17 @@
 pragma solidity >=0.7.5;
 pragma abicoder v2;
 
+import "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1MintCallback.sol";
 import "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1SwapCallback.sol";
 
-// TODO: IMarginalV1MintCallback
-interface ISwapRouter is IMarginalV1SwapCallback {
+interface ISwapRouter is IMarginalV1MintCallback, IMarginalV1SwapCallback {
+    event IncreaseLiquidity(
+        uint128 liquidityDelta,
+        uint256 amount0,
+        uint256 amount1
+    );
+    event DecreaseLiquidity(uint256 shares, uint256 amount0, uint256 amount1);
+
     struct ExactInputSingleParams {
         address tokenIn;
         address tokenOut;
@@ -71,4 +78,42 @@ interface ISwapRouter is IMarginalV1SwapCallback {
     function exactOutput(
         ExactOutputParams calldata params
     ) external payable returns (uint256 amountIn);
+
+    /// @notice Adds liquidity, minting on pool
+    /// @param params The parameters necessary for adding liquidity, encoded as `AddLiquidityParams` in calldata
+    /// @return amount0 The amount of the input token0
+    /// @return amount1 The amount of the input token1
+    function addLiquidity(
+        AddLiquidityParams calldata params
+    ) external payable returns (uint256 amount0, uint256 amount1);
+
+    struct AddLiquidityParams {
+        address token0;
+        address token1;
+        uint24 maintenance;
+        address recipient;
+        uint128 liquidityDelta;
+        uint256 amount0Min;
+        uint256 amount1Min;
+        uint256 deadline;
+    }
+
+    /// @notice Removes liquidity, burning on pool
+    /// @param params The parameters necessary for removing liquidity, encoded as `RemoveLiquidityParams` in calldata
+    /// @return amount0 The amount of the output token0
+    /// @return amount1 The amount of the output token1
+    function removeLiquidity(
+        RemoveLiquidityParams calldata params
+    ) external payable returns (uint256 amount0, uint256 amount1);
+
+    struct RemoveLiquidityParams {
+        address token0;
+        address token1;
+        uint24 maintenance;
+        address recipient;
+        uint256 shares;
+        uint256 amount0Min;
+        uint256 amount1Min;
+        uint256 deadline;
+    }
 }
