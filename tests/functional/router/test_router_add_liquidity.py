@@ -1,0 +1,174 @@
+def test_add_liquidity__updates_liquidity(
+    pool_initialized_with_liquidity,
+    router,
+    sender,
+    alice,
+    chain,
+):
+    state = pool_initialized_with_liquidity.state()
+
+    liquidity_delta = (state.liquidity * 5) // 100  # 5% more liquidity added
+    amount0_min = 0
+    amount1_min = 0
+    deadline = chain.pending_timestamp + 3600
+    params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        alice.address,
+        liquidity_delta,
+        amount0_min,
+        amount1_min,
+        deadline,
+    )
+    router.addLiquidity(params, sender=sender)
+
+    assert (
+        pool_initialized_with_liquidity.state().liquidity
+        == state.liquidity + liquidity_delta
+    )
+
+
+def test_add_liquidity__mints_shares(
+    pool_initialized_with_liquidity,
+    router,
+    sender,
+    alice,
+    chain,
+):
+    state = pool_initialized_with_liquidity.state()
+    shares_before = pool_initialized_with_liquidity.balanceOf(alice.address)
+    total_shares_before = pool_initialized_with_liquidity.totalSupply()
+    total_liquidity_before = (
+        state.liquidity + pool_initialized_with_liquidity.liquidityLocked()
+    )
+
+    liquidity_delta = (state.liquidity * 5) // 100  # 5% more liquidity added
+    shares = (liquidity_delta * total_shares_before) // total_liquidity_before
+    amount0_min = 0
+    amount1_min = 0
+    deadline = chain.pending_timestamp + 3600
+    params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        alice.address,
+        liquidity_delta,
+        amount0_min,
+        amount1_min,
+        deadline,
+    )
+    router.addLiquidity(params, sender=sender)
+
+    assert (
+        pool_initialized_with_liquidity.balanceOf(alice.address)
+        == shares_before + shares
+    )
+    assert pool_initialized_with_liquidity.totalSupply() == total_shares_before + shares
+
+
+def test_add_liquidity__transfers_funds(
+    pool_initialized_with_liquidity,
+    router,
+    sender,
+    alice,
+    chain,
+    token0,
+    token1,
+    liquidity_math_lib,
+):
+    state = pool_initialized_with_liquidity.state()
+
+    balance0_sender = token0.balanceOf(sender.address)
+    balance1_sender = token1.balanceOf(sender.address)
+
+    balance0_pool = token0.balanceOf(pool_initialized_with_liquidity.address)
+    balance1_pool = token1.balanceOf(pool_initialized_with_liquidity.address)
+
+    liquidity_delta = (state.liquidity * 5) // 100  # 5% more liquidity added
+    amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
+
+    amount0_min = 0
+    amount1_min = 0
+    deadline = chain.pending_timestamp + 3600
+    params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        alice.address,
+        liquidity_delta,
+        amount0_min,
+        amount1_min,
+        deadline,
+    )
+    router.addLiquidity(params, sender=sender)
+
+    assert token0.balanceOf(sender.address) == balance0_sender - amount0
+    assert (
+        token0.balanceOf(pool_initialized_with_liquidity.address)
+        == balance0_pool + amount0
+    )
+    assert token1.balanceOf(sender.address) == balance1_sender - amount1
+    assert (
+        token1.balanceOf(pool_initialized_with_liquidity.address)
+        == balance1_pool + amount1
+    )
+
+
+def test_add_liquidity__emits_increase_liquidity(
+    pool_initialized_with_liquidity,
+    router,
+    sender,
+    alice,
+    chain,
+    liquidity_math_lib,
+):
+    state = pool_initialized_with_liquidity.state()
+    total_shares_before = pool_initialized_with_liquidity.totalSupply()
+    total_liquidity_before = (
+        state.liquidity + pool_initialized_with_liquidity.liquidityLocked()
+    )
+
+    liquidity_delta = (state.liquidity * 5) // 100  # 5% more liquidity added
+    shares = (liquidity_delta * total_shares_before) // total_liquidity_before
+    amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
+
+    amount0_min = 0
+    amount1_min = 0
+    deadline = chain.pending_timestamp + 3600
+    params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        alice.address,
+        liquidity_delta,
+        amount0_min,
+        amount1_min,
+        deadline,
+    )
+    tx = router.addLiquidity(params, sender=sender)
+    events = tx.decode_logs(router.IncreaseLiquidity)
+    assert len(events) == 1
+
+    event = events[0]
+    assert event.shares == shares
+    assert event.liquidityDelta == liquidity_delta
+    assert event.amount0 == amount0
+    assert event.amount1 == amount1
+
+
+# TODO:
+def test_add_liquidity__deposits_weth():
+    pass
+
+
+def test_add_liquidity__reverts_when_past_deadline():
+    pass
+
+
+def test_add_liquidity__reverts_when_amount0_less_than_min():
+    pass
+
+
+def test_add_liquidity__reverts_when_amount1_less_than_min():
+    pass
