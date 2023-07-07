@@ -1,3 +1,6 @@
+from ape import reverts
+
+
 def test_add_liquidity__updates_liquidity(
     pool_initialized_with_liquidity,
     router,
@@ -162,13 +165,91 @@ def test_add_liquidity__deposits_weth():
     pass
 
 
-def test_add_liquidity__reverts_when_past_deadline():
-    pass
+def test_add_liquidity__reverts_when_past_deadline(
+    pool_initialized_with_liquidity,
+    router,
+    sender,
+    alice,
+    chain,
+):
+    state = pool_initialized_with_liquidity.state()
+
+    liquidity_delta = (state.liquidity * 5) // 100  # 5% more liquidity added
+    amount0_min = 0
+    amount1_min = 0
+    deadline = chain.pending_timestamp - 1
+    params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        alice.address,
+        liquidity_delta,
+        amount0_min,
+        amount1_min,
+        deadline,
+    )
+
+    with reverts("Transaction too old"):
+        router.addLiquidity(params, sender=sender)
 
 
-def test_add_liquidity__reverts_when_amount0_less_than_min():
-    pass
+def test_add_liquidity__reverts_when_amount0_less_than_min(
+    pool_initialized_with_liquidity,
+    router,
+    sender,
+    alice,
+    chain,
+    liquidity_math_lib,
+):
+    state = pool_initialized_with_liquidity.state()
+
+    liquidity_delta = (state.liquidity * 5) // 100  # 5% more liquidity added
+    amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
+
+    amount0_min = amount0 + 1
+    amount1_min = 0
+    deadline = chain.pending_timestamp + 3600
+    params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        alice.address,
+        liquidity_delta,
+        amount0_min,
+        amount1_min,
+        deadline,
+    )
+
+    with reverts(router.Amount0LessThanMin, amount0=amount0):
+        router.addLiquidity(params, sender=sender)
 
 
-def test_add_liquidity__reverts_when_amount1_less_than_min():
-    pass
+def test_add_liquidity__reverts_when_amount1_less_than_min(
+    pool_initialized_with_liquidity,
+    router,
+    sender,
+    alice,
+    chain,
+    liquidity_math_lib,
+):
+    state = pool_initialized_with_liquidity.state()
+
+    liquidity_delta = (state.liquidity * 5) // 100  # 5% more liquidity added
+    amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
+
+    amount0_min = 0
+    amount1_min = amount1 + 1
+    deadline = chain.pending_timestamp + 3600
+    params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        alice.address,
+        liquidity_delta,
+        amount0_min,
+        amount1_min,
+        deadline,
+    )
+
+    with reverts(router.Amount1LessThanMin, amount1=amount1):
+        router.addLiquidity(params, sender=sender)
