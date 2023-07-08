@@ -35,16 +35,137 @@ def test_remove_liquidity__updates_liquidity(
     )
 
 
-def test_remove_liquidity__burns_shares():
-    pass
+def test_remove_liquidity__burns_shares(
+    pool_initialized_with_liquidity,
+    router,
+    sender,
+    alice,
+    chain,
+):
+    shares_sender = pool_initialized_with_liquidity.balanceOf(sender.address)
+    total_shares = pool_initialized_with_liquidity.totalSupply()
+
+    shares = shares_sender // 2
+    amount0_min = 0
+    amount1_min = 0
+    deadline = chain.pending_timestamp + 3600
+    params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        alice.address,
+        shares,
+        amount0_min,
+        amount1_min,
+        deadline,
+    )
+    router.removeLiquidity(params, sender=sender)
+
+    assert (
+        pool_initialized_with_liquidity.balanceOf(sender.address)
+        == shares_sender - shares
+    )
+    assert pool_initialized_with_liquidity.totalSupply() == total_shares - shares
 
 
-def test_remove_liquidity__transfers_funds():
-    pass
+def test_remove_liquidity__transfers_funds(
+    pool_initialized_with_liquidity,
+    router,
+    sender,
+    alice,
+    chain,
+    token0,
+    token1,
+    liquidity_math_lib,
+):
+    state = pool_initialized_with_liquidity.state()
+    shares_sender = pool_initialized_with_liquidity.balanceOf(sender.address)
+    total_shares = pool_initialized_with_liquidity.totalSupply()
+    total_liquidity = (
+        state.liquidity + pool_initialized_with_liquidity.liquidityLocked()
+    )
+
+    shares = shares_sender // 2
+    liquidity_delta = (total_liquidity * shares) // total_shares
+    amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
+
+    balance0_alice = token0.balanceOf(alice.address)
+    balance1_alice = token1.balanceOf(alice.address)
+
+    balance0_pool = token0.balanceOf(pool_initialized_with_liquidity.address)
+    balance1_pool = token1.balanceOf(pool_initialized_with_liquidity.address)
+
+    amount0_min = 0
+    amount1_min = 0
+    deadline = chain.pending_timestamp + 3600
+    params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        alice.address,
+        shares,
+        amount0_min,
+        amount1_min,
+        deadline,
+    )
+    router.removeLiquidity(params, sender=sender)
+
+    assert token0.balanceOf(alice.address) == balance0_alice + amount0
+    assert token1.balanceOf(alice.address) == balance1_alice + amount1
+
+    assert (
+        token0.balanceOf(pool_initialized_with_liquidity.address)
+        == balance0_pool - amount0
+    )
+    assert (
+        token1.balanceOf(pool_initialized_with_liquidity.address)
+        == balance1_pool - amount1
+    )
 
 
-def test_remove_liquidity__emits_decrease_liquidity():
-    pass
+def test_remove_liquidity__emits_decrease_liquidity(
+    pool_initialized_with_liquidity,
+    router,
+    sender,
+    alice,
+    chain,
+    liquidity_math_lib,
+):
+    state = pool_initialized_with_liquidity.state()
+    shares_sender = pool_initialized_with_liquidity.balanceOf(sender.address)
+    total_shares = pool_initialized_with_liquidity.totalSupply()
+    total_liquidity = (
+        state.liquidity + pool_initialized_with_liquidity.liquidityLocked()
+    )
+
+    shares = shares_sender // 2
+    liquidity_delta = (total_liquidity * shares) // total_shares
+    amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
+
+    amount0_min = 0
+    amount1_min = 0
+    deadline = chain.pending_timestamp + 3600
+    params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        alice.address,
+        shares,
+        amount0_min,
+        amount1_min,
+        deadline,
+    )
+    tx = router.removeLiquidity(params, sender=sender)
+    assert tx.return_value == (liquidity_delta, amount0, amount1)
+
+    events = tx.decode_logs(router.DecreaseLiquidity)
+    assert len(events) == 1
+
+    event = events[0]
+    assert event.shares == shares
+    assert event.liquidityDelta == liquidity_delta
+    assert event.amount0 == amount0
+    assert event.amount1 == amount1
 
 
 # TODO:
