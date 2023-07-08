@@ -59,13 +59,20 @@ def token1(pool_initialized, token_a, token_b, sender, callee, router, spot_rese
 
 @pytest.fixture(scope="module")
 def pool_initialized_with_liquidity(
-    pool_initialized, callee, token0, token1, sender, spot_liquidity
+    pool_initialized,
+    callee,
+    token0,
+    token1,
+    sender,
+    spot_liquidity,
+    router,
 ):
     liquidity_delta = spot_liquidity * 100 // 10000  # 1% of spot reserves
     callee.mint(
         pool_initialized.address, sender.address, liquidity_delta, sender=sender
     )
     pool_initialized.approve(pool_initialized.address, 2**256 - 1, sender=sender)
+    pool_initialized.approve(router.address, 2**256 - 1, sender=sender)
     return pool_initialized
 
 

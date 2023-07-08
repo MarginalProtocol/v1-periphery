@@ -106,6 +106,9 @@ abstract contract LiquidityManagement is
         });
         IMarginalV1Pool pool = getPool(poolKey);
 
+        if (params.shares > 0)
+            pay(address(pool), msg.sender, address(this), params.shares);
+
         (liquidityDelta, amount0, amount1) = pool.burn(
             params.recipient,
             params.shares
