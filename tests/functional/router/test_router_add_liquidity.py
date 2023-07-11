@@ -1,7 +1,7 @@
 from ape import reverts
 
 
-def test_add_liquidity__updates_liquidity(
+def test_router_add_liquidity__updates_liquidity(
     pool_initialized_with_liquidity,
     router,
     sender,
@@ -32,7 +32,7 @@ def test_add_liquidity__updates_liquidity(
     )
 
 
-def test_add_liquidity__mints_shares(
+def test_router_add_liquidity__mints_shares(
     pool_initialized_with_liquidity,
     router,
     sender,
@@ -70,7 +70,7 @@ def test_add_liquidity__mints_shares(
     assert pool_initialized_with_liquidity.totalSupply() == total_shares_before + shares
 
 
-def test_add_liquidity__transfers_funds(
+def test_router_add_liquidity__transfers_funds(
     pool_initialized_with_liquidity,
     router,
     sender,
@@ -118,7 +118,7 @@ def test_add_liquidity__transfers_funds(
     )
 
 
-def test_add_liquidity__emits_increase_liquidity(
+def test_router_add_liquidity__emits_increase_liquidity(
     pool_initialized_with_liquidity,
     router,
     sender,
@@ -161,11 +161,11 @@ def test_add_liquidity__emits_increase_liquidity(
 
 
 # TODO:
-def test_add_liquidity__deposits_weth():
+def test_router_add_liquidity__deposits_weth():
     pass
 
 
-def test_add_liquidity__reverts_when_past_deadline(
+def test_router_add_liquidity__reverts_when_past_deadline(
     pool_initialized_with_liquidity,
     router,
     sender,
@@ -193,7 +193,7 @@ def test_add_liquidity__reverts_when_past_deadline(
         router.addLiquidity(params, sender=sender)
 
 
-def test_add_liquidity__reverts_when_amount0_less_than_min(
+def test_router_add_liquidity__reverts_when_amount0_less_than_min(
     pool_initialized_with_liquidity,
     router,
     sender,
@@ -224,7 +224,7 @@ def test_add_liquidity__reverts_when_amount0_less_than_min(
         router.addLiquidity(params, sender=sender)
 
 
-def test_add_liquidity__reverts_when_amount1_less_than_min(
+def test_router_add_liquidity__reverts_when_amount1_less_than_min(
     pool_initialized_with_liquidity,
     router,
     sender,

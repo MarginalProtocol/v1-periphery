@@ -1,7 +1,7 @@
 from ape import reverts
 
 
-def test_remove_liquidity__updates_liquidity(
+def test_router_remove_liquidity__updates_liquidity(
     pool_initialized_with_liquidity,
     router,
     sender,
@@ -38,7 +38,7 @@ def test_remove_liquidity__updates_liquidity(
     )
 
 
-def test_remove_liquidity__burns_shares(
+def test_router_remove_liquidity__burns_shares(
     pool_initialized_with_liquidity,
     router,
     sender,
@@ -71,7 +71,7 @@ def test_remove_liquidity__burns_shares(
     assert pool_initialized_with_liquidity.totalSupply() == total_shares - shares
 
 
-def test_remove_liquidity__transfers_funds(
+def test_router_remove_liquidity__transfers_funds(
     pool_initialized_with_liquidity,
     router,
     sender,
@@ -126,7 +126,7 @@ def test_remove_liquidity__transfers_funds(
     )
 
 
-def test_remove_liquidity__emits_decrease_liquidity(
+def test_router_remove_liquidity__emits_decrease_liquidity(
     pool_initialized_with_liquidity,
     router,
     sender,
@@ -172,11 +172,11 @@ def test_remove_liquidity__emits_decrease_liquidity(
 
 
 # TODO:
-def test_remove_liquidity__deposits_weth():
+def test_router_remove_liquidity__deposits_weth():
     pass
 
 
-def test_remove_liquidity__reverts_when_past_deadline(
+def test_router_remove_liquidity__reverts_when_past_deadline(
     pool_initialized_with_liquidity,
     router,
     sender,
@@ -203,7 +203,7 @@ def test_remove_liquidity__reverts_when_past_deadline(
         router.removeLiquidity(params, sender=sender)
 
 
-def test_remove_liquidity__reverts_when_amount0_less_than_min(
+def test_router_remove_liquidity__reverts_when_amount0_less_than_min(
     pool_initialized_with_liquidity,
     router,
     sender,
@@ -240,7 +240,7 @@ def test_remove_liquidity__reverts_when_amount0_less_than_min(
         router.removeLiquidity(params, sender=sender)
 
 
-def test_remove_liquidity__reverts_when_amount1_less_than_min(
+def test_router_remove_liquidity__reverts_when_amount1_less_than_min(
     pool_initialized_with_liquidity,
     router,
     sender,
