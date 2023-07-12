@@ -102,7 +102,8 @@ interface ISwapRouter is IMarginalV1MintCallback, IMarginalV1SwapCallback {
         address token1;
         uint24 maintenance;
         address recipient;
-        uint128 liquidityDelta;
+        uint256 amount0Desired;
+        uint256 amount1Desired;
         uint256 amount0Min;
         uint256 amount1Min;
         uint256 deadline;

@@ -7,10 +7,21 @@ def test_router_add_liquidity__updates_liquidity(
     sender,
     alice,
     chain,
+    liquidity_math_lib,
+    liquidity_amounts_lib,
 ):
     state = pool_initialized_with_liquidity.state()
 
-    liquidity_delta = (state.liquidity * 5) // 100  # 5% more liquidity added
+    liquidity_delta_desired = (state.liquidity * 5) // 100  # 5% more liquidity added
+    amount0_desired, amount1_desired = liquidity_math_lib.toAmounts(
+        liquidity_delta_desired, state.sqrtPriceX96
+    )
+
+    liquidity_delta = liquidity_amounts_lib.getLiquidityForAmounts(
+        state.sqrtPriceX96, amount0_desired, amount1_desired
+    )
+    amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
+
     amount0_min = 0
     amount1_min = 0
     deadline = chain.pending_timestamp + 3600
@@ -19,7 +30,8 @@ def test_router_add_liquidity__updates_liquidity(
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
         alice.address,
-        liquidity_delta,
+        amount0,
+        amount1,
         amount0_min,
         amount1_min,
         deadline,
@@ -38,6 +50,8 @@ def test_router_add_liquidity__mints_shares(
     sender,
     alice,
     chain,
+    liquidity_math_lib,
+    liquidity_amounts_lib,
 ):
     state = pool_initialized_with_liquidity.state()
     shares_before = pool_initialized_with_liquidity.balanceOf(alice.address)
@@ -46,7 +60,16 @@ def test_router_add_liquidity__mints_shares(
         state.liquidity + pool_initialized_with_liquidity.liquidityLocked()
     )
 
-    liquidity_delta = (state.liquidity * 5) // 100  # 5% more liquidity added
+    liquidity_delta_desired = (state.liquidity * 5) // 100  # 5% more liquidity added
+    amount0_desired, amount1_desired = liquidity_math_lib.toAmounts(
+        liquidity_delta_desired, state.sqrtPriceX96
+    )
+
+    liquidity_delta = liquidity_amounts_lib.getLiquidityForAmounts(
+        state.sqrtPriceX96, amount0_desired, amount1_desired
+    )
+    amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
+
     shares = (liquidity_delta * total_shares_before) // total_liquidity_before
     amount0_min = 0
     amount1_min = 0
@@ -56,7 +79,8 @@ def test_router_add_liquidity__mints_shares(
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
         alice.address,
-        liquidity_delta,
+        amount0,
+        amount1,
         amount0_min,
         amount1_min,
         deadline,
@@ -79,6 +103,7 @@ def test_router_add_liquidity__transfers_funds(
     token0,
     token1,
     liquidity_math_lib,
+    liquidity_amounts_lib,
 ):
     state = pool_initialized_with_liquidity.state()
 
@@ -88,7 +113,14 @@ def test_router_add_liquidity__transfers_funds(
     balance0_pool = token0.balanceOf(pool_initialized_with_liquidity.address)
     balance1_pool = token1.balanceOf(pool_initialized_with_liquidity.address)
 
-    liquidity_delta = (state.liquidity * 5) // 100  # 5% more liquidity added
+    liquidity_delta_desired = (state.liquidity * 5) // 100  # 5% more liquidity added
+    amount0_desired, amount1_desired = liquidity_math_lib.toAmounts(
+        liquidity_delta_desired, state.sqrtPriceX96
+    )
+
+    liquidity_delta = liquidity_amounts_lib.getLiquidityForAmounts(
+        state.sqrtPriceX96, amount0_desired, amount1_desired
+    )
     amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
 
     amount0_min = 0
@@ -99,7 +131,8 @@ def test_router_add_liquidity__transfers_funds(
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
         alice.address,
-        liquidity_delta,
+        amount0,
+        amount1,
         amount0_min,
         amount1_min,
         deadline,
@@ -125,6 +158,7 @@ def test_router_add_liquidity__emits_increase_liquidity(
     alice,
     chain,
     liquidity_math_lib,
+    liquidity_amounts_lib,
 ):
     state = pool_initialized_with_liquidity.state()
     total_shares_before = pool_initialized_with_liquidity.totalSupply()
@@ -132,9 +166,16 @@ def test_router_add_liquidity__emits_increase_liquidity(
         state.liquidity + pool_initialized_with_liquidity.liquidityLocked()
     )
 
-    liquidity_delta = (state.liquidity * 5) // 100  # 5% more liquidity added
-    shares = (liquidity_delta * total_shares_before) // total_liquidity_before
+    liquidity_delta_desired = (state.liquidity * 5) // 100  # 5% more liquidity added
+    amount0_desired, amount1_desired = liquidity_math_lib.toAmounts(
+        liquidity_delta_desired, state.sqrtPriceX96
+    )
+
+    liquidity_delta = liquidity_amounts_lib.getLiquidityForAmounts(
+        state.sqrtPriceX96, amount0_desired, amount1_desired
+    )
     amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
+    shares = (liquidity_delta * total_shares_before) // total_liquidity_before
 
     amount0_min = 0
     amount1_min = 0
@@ -144,7 +185,8 @@ def test_router_add_liquidity__emits_increase_liquidity(
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
         alice.address,
-        liquidity_delta,
+        amount0,
+        amount1,
         amount0_min,
         amount1_min,
         deadline,
@@ -171,10 +213,21 @@ def test_router_add_liquidity__reverts_when_past_deadline(
     sender,
     alice,
     chain,
+    liquidity_math_lib,
+    liquidity_amounts_lib,
 ):
     state = pool_initialized_with_liquidity.state()
 
-    liquidity_delta = (state.liquidity * 5) // 100  # 5% more liquidity added
+    liquidity_delta_desired = (state.liquidity * 5) // 100  # 5% more liquidity added
+    amount0_desired, amount1_desired = liquidity_math_lib.toAmounts(
+        liquidity_delta_desired, state.sqrtPriceX96
+    )
+
+    liquidity_delta = liquidity_amounts_lib.getLiquidityForAmounts(
+        state.sqrtPriceX96, amount0_desired, amount1_desired
+    )
+    amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
+
     amount0_min = 0
     amount1_min = 0
     deadline = chain.pending_timestamp - 1
@@ -183,7 +236,8 @@ def test_router_add_liquidity__reverts_when_past_deadline(
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
         alice.address,
-        liquidity_delta,
+        amount0,
+        amount1,
         amount0_min,
         amount1_min,
         deadline,
@@ -200,10 +254,18 @@ def test_router_add_liquidity__reverts_when_amount0_less_than_min(
     alice,
     chain,
     liquidity_math_lib,
+    liquidity_amounts_lib,
 ):
     state = pool_initialized_with_liquidity.state()
 
-    liquidity_delta = (state.liquidity * 5) // 100  # 5% more liquidity added
+    liquidity_delta_desired = (state.liquidity * 5) // 100  # 5% more liquidity added
+    amount0_desired, amount1_desired = liquidity_math_lib.toAmounts(
+        liquidity_delta_desired, state.sqrtPriceX96
+    )
+
+    liquidity_delta = liquidity_amounts_lib.getLiquidityForAmounts(
+        state.sqrtPriceX96, amount0_desired, amount1_desired
+    )
     amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
 
     amount0_min = amount0 + 1
@@ -214,7 +276,8 @@ def test_router_add_liquidity__reverts_when_amount0_less_than_min(
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
         alice.address,
-        liquidity_delta,
+        amount0,
+        amount1,
         amount0_min,
         amount1_min,
         deadline,
@@ -231,10 +294,18 @@ def test_router_add_liquidity__reverts_when_amount1_less_than_min(
     alice,
     chain,
     liquidity_math_lib,
+    liquidity_amounts_lib,
 ):
     state = pool_initialized_with_liquidity.state()
 
-    liquidity_delta = (state.liquidity * 5) // 100  # 5% more liquidity added
+    liquidity_delta_desired = (state.liquidity * 5) // 100  # 5% more liquidity added
+    amount0_desired, amount1_desired = liquidity_math_lib.toAmounts(
+        liquidity_delta_desired, state.sqrtPriceX96
+    )
+
+    liquidity_delta = liquidity_amounts_lib.getLiquidityForAmounts(
+        state.sqrtPriceX96, amount0_desired, amount1_desired
+    )
     amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
 
     amount0_min = 0
@@ -245,7 +316,8 @@ def test_router_add_liquidity__reverts_when_amount1_less_than_min(
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
         alice.address,
-        liquidity_delta,
+        amount0,
+        amount1,
         amount0_min,
         amount1_min,
         deadline,

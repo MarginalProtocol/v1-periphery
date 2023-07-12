@@ -21,9 +21,11 @@ import {ISwapRouter} from "./interfaces/ISwapRouter.sol";
 import {LiquidityManagement} from "./base/LiquidityManagement.sol";
 import {PeripheryImmutableState} from "./base/PeripheryImmutableState.sol";
 import {PeripheryPaymentsWithFee} from "./base/PeripheryPaymentsWithFee.sol";
-import {PoolAddress} from "./libraries/PoolAddress.sol";
+
 import {CallbackValidation} from "./libraries/CallbackValidation.sol";
+import {LiquidityAmounts} from "./libraries/LiquidityAmounts.sol";
 import {Path} from "./libraries/Path.sol";
+import {PoolAddress} from "./libraries/PoolAddress.sol";
 
 contract SwapRouter is
     ISwapRouter,
@@ -314,18 +316,29 @@ contract SwapRouter is
         checkDeadline(params.deadline)
         returns (uint256 shares, uint256 amount0, uint256 amount1)
     {
+        (, uint160 sqrtPriceX96, , , , , , ) = getPool(
+            params.token0,
+            params.token1,
+            params.maintenance
+        ).state();
+        uint128 liquidityDelta = LiquidityAmounts.getLiquidityForAmounts(
+            sqrtPriceX96,
+            params.amount0Desired,
+            params.amount1Desired
+        );
+
         (shares, amount0, amount1) = mint(
             MintParams({
                 token0: params.token0,
                 token1: params.token1,
                 maintenance: params.maintenance,
                 recipient: params.recipient,
-                liquidityDelta: params.liquidityDelta,
+                liquidityDelta: liquidityDelta,
                 amount0Min: params.amount0Min,
                 amount1Min: params.amount1Min
             })
         );
-        emit IncreaseLiquidity(shares, params.liquidityDelta, amount0, amount1);
+        emit IncreaseLiquidity(shares, liquidityDelta, amount0, amount1);
     }
 
     /// @inheritdoc ISwapRouter

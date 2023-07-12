@@ -93,7 +93,6 @@ contract NonfungiblePositionManager is
         ) = IMarginalV1Pool(pool).positions(key);
     }
 
-    // TODO: router like abstractions of sqrtPriceLimitX96, zeroForOne?
     /// @notice Mints a new position, opening on pool
     function mint(
         MintParams calldata params
