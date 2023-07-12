@@ -52,23 +52,24 @@ def test_router_exact_input_single__updates_state(
     router.exactInputSingle(params, sender=sender)
 
     # calculate liquidity, sqrtPriceX96 update in slightly diff way than on-chain. check close
+    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee)
     sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextSwap(
         state.liquidity,
         state.sqrtPriceX96,
         zero_for_one,
-        amount_in,
+        amount_in_less_fee,
     )  # price change before fees added
 
     # fees on amount in
-    fees = swap_math_lib.swapFees(amount_in, fee)
+    fees = amount_in - amount_in_less_fee
     amount0 = fees if zero_for_one else 0
     amount1 = 0 if zero_for_one else fees
 
-    (liquidity_after, sqrt_price_x96_after) = liquidity_math_lib.liquiditySqrtPriceX96Next(
-        state.liquidity,
-        sqrt_price_x96_next,
-        amount0,
-        amount1
+    (
+        liquidity_after,
+        sqrt_price_x96_after,
+    ) = liquidity_math_lib.liquiditySqrtPriceX96Next(
+        state.liquidity, sqrt_price_x96_next, amount0, amount1
     )
 
     result = pool_initialized_with_liquidity.state()

@@ -24,7 +24,7 @@ dependencies:
     ref: 0.8
   - name: marginal-v1-core
     local: ../v1-core
-    version: 1.0.0-beta.6
+    version: 1.0.0-beta.7
 
 solidity:
   runs: 200
@@ -33,4 +33,4 @@ solidity:
     - "@openzeppelin/contracts=openzeppelin/v4.8.3"
     - "@uniswap/v3-core/contracts=uniswap-v3-core/v0.8"
     - "@uniswap/v3-periphery/contracts=uniswap-v3-periphery/v0.8"
-    - "@marginal/v1-core/contracts=marginal-v1-core/v1.0.0-beta.6"
+    - "@marginal/v1-core/contracts=marginal-v1-core/v1.0.0-beta.7"
