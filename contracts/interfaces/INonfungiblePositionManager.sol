@@ -33,10 +33,10 @@ interface INonfungiblePositionManager is IERC721 {
         address token1;
         uint24 maintenance;
         bool zeroForOne;
-        uint128 liquidityDelta;
+        uint128 sizeDesired;
+        uint128 sizeMinimum;
         uint160 sqrtPriceLimitX96;
         uint128 margin;
-        uint256 sizeMinimum;
         address recipient;
         uint256 deadline;
     }

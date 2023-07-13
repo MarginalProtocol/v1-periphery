@@ -21,25 +21,26 @@ def test_manager_mint__opens_position(
     chain,
     position_lib,
     sqrt_price_math_lib,
+    position_amounts_lib,
     rando_univ3_observations,
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
-    liquidity_delta = (state.liquidity * 5) // 100  # 5% borrowed for 1% size
-    (amount0, amount1) = calc_amounts_from_liquidity_sqrt_price_x96(
-        liquidity_delta, state.sqrtPriceX96
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
     )
-    amount = amount1 if zero_for_one else amount0
+    reserve = reserve1 if zero_for_one else reserve0
 
-    size = int(
-        (amount * maintenance)
-        // (maintenance + MAINTENANCE_UNIT - liquidity_delta / state.liquidity)
-    )
+    size = reserve * 1 // 100  # 1% of reserves
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
     deadline = chain.pending_timestamp + 3600
+
+    liquidity_delta = position_amounts_lib.getLiquidityForSize(
+        state.liquidity, state.sqrtPriceX96, maintenance, zero_for_one, size
+    )  # ~ 5% for 1% size
 
     tick_cumulative = state.tickCumulative + state.tick * (
         chain.pending_timestamp - state.blockTimestamp
@@ -67,10 +68,10 @@ def test_manager_mint__opens_position(
         pool_initialized_with_liquidity.token1(),
         maintenance,
         zero_for_one,
-        liquidity_delta,
+        size,
+        size_min,
         sqrt_price_limit_x96,
         margin,
-        size_min,
         sender.address,
         deadline,
     )
@@ -95,16 +96,12 @@ def test_manager_mint__mints_token(
     maintenance = pool_initialized_with_liquidity.maintenance()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
-    liquidity_delta = (state.liquidity * 5) // 100  # 5% borrowed for 1% size
-    (amount0, amount1) = calc_amounts_from_liquidity_sqrt_price_x96(
-        liquidity_delta, state.sqrtPriceX96
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
     )
-    amount = amount1 if zero_for_one else amount0
+    reserve = reserve1 if zero_for_one else reserve0
 
-    size = int(
-        (amount * maintenance)
-        // (maintenance + MAINTENANCE_UNIT - liquidity_delta / state.liquidity)
-    )
+    size = reserve * 1 // 100  # 1% of reserves
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
     deadline = chain.pending_timestamp + 3600
@@ -114,10 +111,10 @@ def test_manager_mint__mints_token(
         pool_initialized_with_liquidity.token1(),
         maintenance,
         zero_for_one,
-        liquidity_delta,
+        size,
+        size_min,
         sqrt_price_limit_x96,
         margin,
-        size_min,
         sender.address,
         deadline,
     )
@@ -140,16 +137,12 @@ def test_manager_mint__sets_position_ref(
     maintenance = pool_initialized_with_liquidity.maintenance()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
-    liquidity_delta = (state.liquidity * 5) // 100  # 5% borrowed for 1% size
-    (amount0, amount1) = calc_amounts_from_liquidity_sqrt_price_x96(
-        liquidity_delta, state.sqrtPriceX96
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
     )
-    amount = amount1 if zero_for_one else amount0
+    reserve = reserve1 if zero_for_one else reserve0
 
-    size = int(
-        (amount * maintenance)
-        // (maintenance + MAINTENANCE_UNIT - liquidity_delta / state.liquidity)
-    )
+    size = reserve * 1 // 100  # 1% of reserves
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
     deadline = chain.pending_timestamp + 3600
@@ -159,10 +152,10 @@ def test_manager_mint__sets_position_ref(
         pool_initialized_with_liquidity.token1(),
         maintenance,
         zero_for_one,
-        liquidity_delta,
+        size,
+        size_min,
         sqrt_price_limit_x96,
         margin,
-        size_min,
         sender.address,
         deadline,
     )
@@ -195,16 +188,12 @@ def test_manager_mint__transfers_funds(
     maintenance = pool_initialized_with_liquidity.maintenance()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
-    liquidity_delta = (state.liquidity * 5) // 100  # 5% borrowed for 1% size
-    (amount0, amount1) = calc_amounts_from_liquidity_sqrt_price_x96(
-        liquidity_delta, state.sqrtPriceX96
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
     )
-    amount = amount1 if zero_for_one else amount0
+    reserve = reserve1 if zero_for_one else reserve0
 
-    size = int(
-        (amount * maintenance)
-        // (maintenance + MAINTENANCE_UNIT - liquidity_delta / state.liquidity)
-    )
+    size = reserve * 1 // 100  # 1% of reserves
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
     deadline = chain.pending_timestamp + 3600
@@ -218,10 +207,10 @@ def test_manager_mint__transfers_funds(
         pool_initialized_with_liquidity.token1(),
         maintenance,
         zero_for_one,
-        liquidity_delta,
+        size,
+        size_min,
         sqrt_price_limit_x96,
         margin,
-        size_min,
         sender.address,
         deadline,
     )
@@ -255,16 +244,12 @@ def test_manager_mint__emits_mint(
     maintenance = pool_initialized_with_liquidity.maintenance()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
-    liquidity_delta = (state.liquidity * 5) // 100  # 5% borrowed for 1% size
-    (amount0, amount1) = calc_amounts_from_liquidity_sqrt_price_x96(
-        liquidity_delta, state.sqrtPriceX96
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
     )
-    amount = amount1 if zero_for_one else amount0
+    reserve = reserve1 if zero_for_one else reserve0
 
-    size = int(
-        (amount * maintenance)
-        // (maintenance + MAINTENANCE_UNIT - liquidity_delta / state.liquidity)
-    )
+    size = reserve * 1 // 100  # 1% of reserves
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
     deadline = chain.pending_timestamp + 3600
@@ -274,10 +259,10 @@ def test_manager_mint__emits_mint(
         pool_initialized_with_liquidity.token1(),
         maintenance,
         zero_for_one,
-        liquidity_delta,
+        size,
+        size_min,
         sqrt_price_limit_x96,
         margin,
-        size_min,
         sender.address,
         deadline,
     )
@@ -316,16 +301,12 @@ def test_manager_mint__reverts_when_past_deadline(
     maintenance = pool_initialized_with_liquidity.maintenance()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
-    liquidity_delta = (state.liquidity * 5) // 100  # 5% borrowed for 1% size
-    (amount0, amount1) = calc_amounts_from_liquidity_sqrt_price_x96(
-        liquidity_delta, state.sqrtPriceX96
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
     )
-    amount = amount1 if zero_for_one else amount0
+    reserve = reserve1 if zero_for_one else reserve0
 
-    size = int(
-        (amount * maintenance)
-        // (maintenance + MAINTENANCE_UNIT - liquidity_delta / state.liquidity)
-    )
+    size = reserve * 1 // 100  # 1% of reserves
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
     deadline = chain.pending_timestamp - 1
@@ -335,10 +316,10 @@ def test_manager_mint__reverts_when_past_deadline(
         pool_initialized_with_liquidity.token1(),
         maintenance,
         zero_for_one,
-        liquidity_delta,
+        size,
+        size_min,
         sqrt_price_limit_x96,
         margin,
-        size_min,
         sender.address,
         deadline,
     )
@@ -356,23 +337,25 @@ def test_manager_mint__reverts_when_size_less_than_min(
     chain,
     position_lib,
     sqrt_price_math_lib,
+    position_amounts_lib,
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
-    liquidity_delta = (state.liquidity * 5) // 100  # 5% borrowed for 1% size
-    (amount0, amount1) = calc_amounts_from_liquidity_sqrt_price_x96(
-        liquidity_delta, state.sqrtPriceX96
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
     )
-    amount = amount1 if zero_for_one else amount0
+    reserve = reserve1 if zero_for_one else reserve0
 
-    size = int(
-        (amount * maintenance)
-        // (maintenance + MAINTENANCE_UNIT - liquidity_delta / state.liquidity)
-    )
+    size = reserve * 1 // 100  # 1% of reserves
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
+    size_min = (size * 80) // 100
     deadline = chain.pending_timestamp + 3600
+
+    liquidity_delta = position_amounts_lib.getLiquidityForSize(
+        state.liquidity, state.sqrtPriceX96, maintenance, zero_for_one, size
+    )  # ~ 5% for 1% size
 
     sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextOpen(
         state.liquidity, state.sqrtPriceX96, liquidity_delta, zero_for_one, maintenance
@@ -394,10 +377,10 @@ def test_manager_mint__reverts_when_size_less_than_min(
         pool_initialized_with_liquidity.token1(),
         maintenance,
         zero_for_one,
-        liquidity_delta,
+        size,
+        size_min,
         sqrt_price_limit_x96,
         margin,
-        size_min,
         sender.address,
         deadline,
     )

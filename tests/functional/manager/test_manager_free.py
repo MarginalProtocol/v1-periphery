@@ -20,16 +20,12 @@ def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
         sqrt_price_limit_x96 = (
             MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
         )
-        liquidity_delta = (state.liquidity * 5) // 100  # 5% borrowed for 1% size
-        (amount0, amount1) = calc_amounts_from_liquidity_sqrt_price_x96(
-            liquidity_delta, state.sqrtPriceX96
+        (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+            state.liquidity, state.sqrtPriceX96
         )
-        amount = amount1 if zero_for_one else amount0
+        reserve = reserve1 if zero_for_one else reserve0
 
-        size = int(
-            (amount * maintenance)
-            // (maintenance + MAINTENANCE_UNIT - liquidity_delta / state.liquidity)
-        )
+        size = reserve * 1 // 100  # 1% of reserves
         margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
         size_min = (size * 80) // 100
         deadline = chain.pending_timestamp + 3600
@@ -39,10 +35,10 @@ def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
             pool_initialized_with_liquidity.token1(),
             maintenance,
             zero_for_one,
-            liquidity_delta,
+            size,
+            size_min,
             sqrt_price_limit_x96,
             margin,
-            size_min,
             sender.address,
             deadline,
         )

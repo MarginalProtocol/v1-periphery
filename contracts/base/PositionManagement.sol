@@ -44,19 +44,19 @@ abstract contract PositionManagement is
         uint128 liquidityDelta;
         uint160 sqrtPriceLimitX96;
         uint128 margin;
-        uint256 sizeMinimum;
+        uint128 sizeMinimum;
     }
 
     /// @notice Opens a new position on pool
     function open(
         OpenParams memory params
-    ) internal returns (uint256 id, uint256 size, IMarginalV1Pool pool) {
+    ) internal returns (uint256 id, uint256 size) {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
             maintenance: params.maintenance
         });
-        pool = getPool(poolKey);
+        IMarginalV1Pool pool = getPool(poolKey);
 
         (id, size) = pool.open(
             params.recipient,
@@ -68,7 +68,7 @@ abstract contract PositionManagement is
                 PositionCallbackData({poolKey: poolKey, payer: msg.sender})
             )
         );
-        if (size < params.sizeMinimum) revert SizeLessThanMin(size);
+        if (size < uint256(params.sizeMinimum)) revert SizeLessThanMin(size);
     }
 
     function marginalV1OpenCallback(

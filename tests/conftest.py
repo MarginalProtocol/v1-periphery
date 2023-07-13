@@ -232,3 +232,8 @@ def swap_math_lib(project, accounts):
 @pytest.fixture(scope="session")
 def liquidity_amounts_lib(project, accounts):
     return project.MockLiquidityAmounts.deploy(sender=accounts[0])
+
+
+@pytest.fixture(scope="session")
+def position_amounts_lib(project, accounts):
+    return project.MockPositionAmounts.deploy(sender=accounts[0])

@@ -10,8 +10,11 @@ import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV
 
 import {PeripheryImmutableState} from "./base/PeripheryImmutableState.sol";
 import {PositionManagement} from "./base/PositionManagement.sol";
-import {INonfungiblePositionManager} from "./interfaces/INonfungiblePositionManager.sol";
+
 import {PoolAddress} from "./libraries/PoolAddress.sol";
+import {PositionAmounts} from "./libraries/PositionAmounts.sol";
+
+import {INonfungiblePositionManager} from "./interfaces/INonfungiblePositionManager.sol";
 
 contract NonfungiblePositionManager is
     INonfungiblePositionManager,
@@ -50,6 +53,22 @@ contract NonfungiblePositionManager is
         ERC721("Marginal V1 Position Token", "MRGLV1-POS")
         PeripheryImmutableState(_factory, _WETH9)
     {}
+
+    /// @dev Returns the pool for the given token pair and maintenance. The pool contract may or may not exist.
+    function getPool(
+        address tokenA,
+        address tokenB,
+        uint24 maintenance
+    ) private view returns (IMarginalV1Pool) {
+        return
+            IMarginalV1Pool(
+                PoolAddress.computeAddress(
+                    deployer,
+                    factory,
+                    PoolAddress.getPoolKey(tokenA, tokenB, maintenance)
+                )
+            );
+    }
 
     // TODO: check for re-entrancy view issues and warn @dev if so
     function positions(
@@ -102,16 +121,29 @@ contract NonfungiblePositionManager is
         checkDeadline(params.deadline)
         returns (uint256 tokenId, uint256 size)
     {
-        IMarginalV1Pool pool;
+        IMarginalV1Pool pool = getPool(
+            params.token0,
+            params.token1,
+            params.maintenance
+        );
+        (uint128 liquidity, uint160 sqrtPriceX96, , , , , , ) = pool.state();
+        uint128 liquidityDelta = PositionAmounts.getLiquidityForSize(
+            liquidity,
+            sqrtPriceX96,
+            params.maintenance,
+            params.zeroForOne,
+            params.sizeDesired
+        );
+
         uint256 positionId;
-        (positionId, size, pool) = open(
+        (positionId, size) = open(
             OpenParams({
                 token0: params.token0,
                 token1: params.token1,
                 maintenance: params.maintenance,
                 recipient: address(this),
                 zeroForOne: params.zeroForOne,
-                liquidityDelta: params.liquidityDelta,
+                liquidityDelta: liquidityDelta,
                 sqrtPriceLimitX96: params.sqrtPriceLimitX96,
                 margin: params.margin,
                 sizeMinimum: params.sizeMinimum
