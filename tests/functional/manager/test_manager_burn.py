@@ -29,6 +29,7 @@ def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
         size = reserve * 1 // 100  # 1% of reserves
         margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
         size_min = (size * 80) // 100
+        debt_max = 2**128 - 1
         deadline = chain.pending_timestamp + 3600
 
         mint_params = (
@@ -38,13 +39,14 @@ def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
             zero_for_one,
             size,
             size_min,
+            debt_max,
             sqrt_price_limit_x96,
             margin,
             sender.address,
             deadline,
         )
         tx = manager.mint(mint_params, sender=sender)
-        token_id, _ = tx.return_value
+        token_id, _, _ = tx.return_value
         return int(token_id)
 
     yield mint

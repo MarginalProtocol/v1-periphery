@@ -12,6 +12,9 @@ from utils.constants import (
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
 
 
+# TODO: test when sqrtPriceLimitX96, debtMaximum == 0
+
+
 @pytest.mark.parametrize("zero_for_one", [True, False])
 def test_manager_mint__opens_position(
     pool_initialized_with_liquidity,
@@ -36,6 +39,7 @@ def test_manager_mint__opens_position(
     size = reserve * 1 // 100  # 1% of reserves
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
+    debt_max = 2**128 - 1
     deadline = chain.pending_timestamp + 3600
 
     liquidity_delta = position_amounts_lib.getLiquidityForSize(
@@ -70,6 +74,7 @@ def test_manager_mint__opens_position(
         zero_for_one,
         size,
         size_min,
+        debt_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
@@ -104,6 +109,7 @@ def test_manager_mint__mints_token(
     size = reserve * 1 // 100  # 1% of reserves
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
+    debt_max = 2**128 - 1
     deadline = chain.pending_timestamp + 3600
 
     mint_params = (
@@ -113,6 +119,7 @@ def test_manager_mint__mints_token(
         zero_for_one,
         size,
         size_min,
+        debt_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
@@ -145,6 +152,7 @@ def test_manager_mint__sets_position_ref(
     size = reserve * 1 // 100  # 1% of reserves
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
+    debt_max = 2**128 - 1
     deadline = chain.pending_timestamp + 3600
 
     mint_params = (
@@ -154,6 +162,7 @@ def test_manager_mint__sets_position_ref(
         zero_for_one,
         size,
         size_min,
+        debt_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
@@ -196,6 +205,7 @@ def test_manager_mint__transfers_funds(
     size = reserve * 1 // 100  # 1% of reserves
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
+    debt_max = 2**128 - 1
     deadline = chain.pending_timestamp + 3600
 
     token = token1 if zero_for_one else token0
@@ -209,6 +219,7 @@ def test_manager_mint__transfers_funds(
         zero_for_one,
         size,
         size_min,
+        debt_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
@@ -252,6 +263,7 @@ def test_manager_mint__emits_mint(
     size = reserve * 1 // 100  # 1% of reserves
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
+    debt_max = 2**128 - 1
     deadline = chain.pending_timestamp + 3600
 
     mint_params = (
@@ -261,6 +273,7 @@ def test_manager_mint__emits_mint(
         zero_for_one,
         size,
         size_min,
+        debt_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
@@ -272,6 +285,7 @@ def test_manager_mint__emits_mint(
     owner = manager.address
     key = get_position_key(owner, position_id)
     position = pool_initialized_with_liquidity.positions(key)
+    debt = position.debt0 if zero_for_one else position.debt1
 
     next_id = 1
     events = tx.decode_logs(manager.Mint)
@@ -280,7 +294,8 @@ def test_manager_mint__emits_mint(
     event = events[0]
     assert event.tokenId == next_id
     assert event.size == position.size
-    assert tx.return_value == (next_id, position.size)
+    assert event.debt == debt
+    assert tx.return_value == (next_id, position.size, debt)
 
 
 # TODO: new pool with weth9
@@ -309,6 +324,7 @@ def test_manager_mint__reverts_when_past_deadline(
     size = reserve * 1 // 100  # 1% of reserves
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
+    debt_max = 2**128 - 1
     deadline = chain.pending_timestamp - 1
 
     mint_params = (
@@ -318,6 +334,7 @@ def test_manager_mint__reverts_when_past_deadline(
         zero_for_one,
         size,
         size_min,
+        debt_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
@@ -330,6 +347,68 @@ def test_manager_mint__reverts_when_past_deadline(
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
 def test_manager_mint__reverts_when_size_less_than_min(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    chain,
+    position_lib,
+    sqrt_price_math_lib,
+    position_amounts_lib,
+):
+    state = pool_initialized_with_liquidity.state()
+    maintenance = pool_initialized_with_liquidity.maintenance()
+
+    sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    reserve = reserve1 if zero_for_one else reserve0
+
+    size = reserve * 1 // 100  # 1% of reserves
+    margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
+    debt_max = 2**128 - 1
+    deadline = chain.pending_timestamp + 3600
+
+    liquidity_delta = position_amounts_lib.getLiquidityForSize(
+        state.liquidity, state.sqrtPriceX96, maintenance, zero_for_one, size
+    )  # ~ 5% for 1% size
+
+    sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextOpen(
+        state.liquidity, state.sqrtPriceX96, liquidity_delta, zero_for_one, maintenance
+    )
+    position = position_lib.assemble(
+        state.liquidity,
+        state.sqrtPriceX96,
+        sqrt_price_x96_next,
+        liquidity_delta,
+        zero_for_one,
+        state.tick,
+        0,
+        0,
+    )
+    size_min = position.size + 1
+
+    mint_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        maintenance,
+        zero_for_one,
+        size,
+        size_min,
+        debt_max,
+        sqrt_price_limit_x96,
+        margin,
+        sender.address,
+        deadline,
+    )
+
+    with reverts(manager.SizeLessThanMin, size=position.size):
+        manager.mint(mint_params, sender=sender)
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_mint__reverts_when_debt_greater_than_max(
     pool_initialized_with_liquidity,
     manager,
     zero_for_one,
@@ -370,7 +449,8 @@ def test_manager_mint__reverts_when_size_less_than_min(
         0,
         0,
     )
-    size_min = position.size + 1
+    debt = position.debt0 if zero_for_one else position.debt1
+    debt_max = debt - 1
 
     mint_params = (
         pool_initialized_with_liquidity.token0(),
@@ -379,11 +459,12 @@ def test_manager_mint__reverts_when_size_less_than_min(
         zero_for_one,
         size,
         size_min,
+        debt_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
         deadline,
     )
 
-    with reverts(manager.SizeLessThanMin, size=position.size):
+    with reverts(manager.DebtGreaterThanMax, debt=debt):
         manager.mint(mint_params, sender=sender)

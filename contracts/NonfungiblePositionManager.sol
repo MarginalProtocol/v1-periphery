@@ -3,6 +3,7 @@ pragma solidity =0.8.15;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
+import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {Multicall} from "@uniswap/v3-periphery/contracts/base/Multicall.sol";
 import {PeripheryValidation} from "@uniswap/v3-periphery/contracts/base/PeripheryValidation.sol";
 
@@ -10,10 +11,8 @@ import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV
 
 import {PeripheryImmutableState} from "./base/PeripheryImmutableState.sol";
 import {PositionManagement} from "./base/PositionManagement.sol";
-
 import {PoolAddress} from "./libraries/PoolAddress.sol";
 import {PositionAmounts} from "./libraries/PositionAmounts.sol";
-
 import {INonfungiblePositionManager} from "./interfaces/INonfungiblePositionManager.sol";
 
 contract NonfungiblePositionManager is
@@ -37,7 +36,7 @@ contract NonfungiblePositionManager is
         _;
     }
 
-    event Mint(uint256 indexed tokenId, uint256 size);
+    event Mint(uint256 indexed tokenId, uint256 size, uint256 debt);
     event Lock(uint256 indexed tokenId, uint256 marginAfter);
     event Free(uint256 indexed tokenId, uint256 marginAfter);
     event Burn(uint256 indexed tokenId, uint256 amountIn, uint256 amountOut);
@@ -119,7 +118,7 @@ contract NonfungiblePositionManager is
         external
         payable
         checkDeadline(params.deadline)
-        returns (uint256 tokenId, uint256 size)
+        returns (uint256 tokenId, uint256 size, uint256 debt)
     {
         IMarginalV1Pool pool = getPool(
             params.token0,
@@ -136,7 +135,7 @@ contract NonfungiblePositionManager is
         );
 
         uint256 positionId;
-        (positionId, size) = open(
+        (positionId, size, debt) = open(
             OpenParams({
                 token0: params.token0,
                 token1: params.token1,
@@ -144,9 +143,18 @@ contract NonfungiblePositionManager is
                 recipient: address(this),
                 zeroForOne: params.zeroForOne,
                 liquidityDelta: liquidityDelta,
-                sqrtPriceLimitX96: params.sqrtPriceLimitX96,
+                sqrtPriceLimitX96: params.sqrtPriceLimitX96 == 0
+                    ? (
+                        params.zeroForOne
+                            ? TickMath.MIN_SQRT_RATIO + 1
+                            : TickMath.MAX_SQRT_RATIO - 1
+                    )
+                    : params.sqrtPriceLimitX96,
                 margin: params.margin,
-                sizeMinimum: params.sizeMinimum
+                sizeMinimum: params.sizeMinimum,
+                debtMaximum: params.debtMaximum == 0
+                    ? type(uint128).max
+                    : params.debtMaximum
             })
         );
 
@@ -157,7 +165,7 @@ contract NonfungiblePositionManager is
             id: uint96(positionId)
         });
 
-        emit Mint(tokenId, size);
+        emit Mint(tokenId, size, debt);
     }
 
     /// @notice Adds margin to an existing position, adjusting on pool

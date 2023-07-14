@@ -24,6 +24,7 @@ abstract contract PositionManagement is
     }
 
     error SizeLessThanMin(uint256 size);
+    error DebtGreaterThanMax(uint256 debt);
 
     /// @dev Returns the pool for the given token pair and maintenance. The pool contract may or may not exist.
     function getPool(
@@ -45,12 +46,13 @@ abstract contract PositionManagement is
         uint160 sqrtPriceLimitX96;
         uint128 margin;
         uint128 sizeMinimum;
+        uint128 debtMaximum;
     }
 
     /// @notice Opens a new position on pool
     function open(
         OpenParams memory params
-    ) internal returns (uint256 id, uint256 size) {
+    ) internal returns (uint256 id, uint256 size, uint256 debt) {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
@@ -58,7 +60,7 @@ abstract contract PositionManagement is
         });
         IMarginalV1Pool pool = getPool(poolKey);
 
-        (id, size) = pool.open(
+        (id, size, debt) = pool.open(
             params.recipient,
             params.zeroForOne,
             params.liquidityDelta,
@@ -69,6 +71,7 @@ abstract contract PositionManagement is
             )
         );
         if (size < uint256(params.sizeMinimum)) revert SizeLessThanMin(size);
+        if (debt > uint256(params.debtMaximum)) revert DebtGreaterThanMax(debt);
     }
 
     function marginalV1OpenCallback(
