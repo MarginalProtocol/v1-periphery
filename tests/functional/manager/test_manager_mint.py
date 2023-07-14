@@ -12,9 +12,6 @@ from utils.constants import (
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
 
 
-# TODO: test when sqrtPriceLimitX96, debtMaximum == 0
-
-
 @pytest.mark.parametrize("zero_for_one", [True, False])
 def test_manager_mint__opens_position(
     pool_initialized_with_liquidity,
@@ -296,6 +293,78 @@ def test_manager_mint__emits_mint(
     assert event.size == position.size
     assert event.debt == debt
     assert tx.return_value == (next_id, position.size, debt)
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_mint__when_sqrt_price_limit_x96_is_zero(
+    pool_initialized_with_liquidity, manager, zero_for_one, sender, chain
+):
+    state = pool_initialized_with_liquidity.state()
+    maintenance = pool_initialized_with_liquidity.maintenance()
+
+    sqrt_price_limit_x96 = 0
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    reserve = reserve1 if zero_for_one else reserve0
+
+    size = reserve * 1 // 100  # 1% of reserves
+    margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
+    size_min = (size * 80) // 100
+    debt_max = 2**128 - 1
+    deadline = chain.pending_timestamp + 3600
+
+    mint_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        maintenance,
+        zero_for_one,
+        size,
+        size_min,
+        debt_max,
+        sqrt_price_limit_x96,
+        margin,
+        sender.address,
+        deadline,
+    )
+    tx = manager.mint(mint_params, sender=sender)
+    assert tx.return_value[0] == 1  # token with ID 1 minted
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_mint__when_debt_max_is_zero(
+    pool_initialized_with_liquidity, manager, zero_for_one, sender, chain
+):
+    state = pool_initialized_with_liquidity.state()
+    maintenance = pool_initialized_with_liquidity.maintenance()
+
+    sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    reserve = reserve1 if zero_for_one else reserve0
+
+    size = reserve * 1 // 100  # 1% of reserves
+    margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
+    size_min = (size * 80) // 100
+    debt_max = 0
+    deadline = chain.pending_timestamp + 3600
+
+    mint_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        maintenance,
+        zero_for_one,
+        size,
+        size_min,
+        debt_max,
+        sqrt_price_limit_x96,
+        margin,
+        sender.address,
+        deadline,
+    )
+    tx = manager.mint(mint_params, sender=sender)
+    assert tx.return_value[0] == 1  # token with ID 1 minted
 
 
 # TODO: new pool with weth9
