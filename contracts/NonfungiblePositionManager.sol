@@ -53,22 +53,6 @@ contract NonfungiblePositionManager is
         PeripheryImmutableState(_factory, _WETH9)
     {}
 
-    /// @dev Returns the pool for the given token pair and maintenance. The pool contract may or may not exist.
-    function getPool(
-        address tokenA,
-        address tokenB,
-        uint24 maintenance
-    ) private view returns (IMarginalV1Pool) {
-        return
-            IMarginalV1Pool(
-                PoolAddress.computeAddress(
-                    deployer,
-                    factory,
-                    PoolAddress.getPoolKey(tokenA, tokenB, maintenance)
-                )
-            );
-    }
-
     // TODO: check for re-entrancy view issues and warn @dev if so
     function positions(
         uint256 tokenId
@@ -121,10 +105,13 @@ contract NonfungiblePositionManager is
         returns (uint256 tokenId, uint256 size, uint256 debt)
     {
         IMarginalV1Pool pool = getPool(
-            params.token0,
-            params.token1,
-            params.maintenance
+            PoolAddress.PoolKey({
+                token0: params.token0,
+                token1: params.token1,
+                maintenance: params.maintenance
+            })
         );
+
         (uint128 liquidity, uint160 sqrtPriceX96, , , , , , ) = pool.state();
         uint128 liquidityDelta = PositionAmounts.getLiquidityForSize(
             liquidity,
