@@ -210,6 +210,11 @@ def pool_address_lib(project, accounts):
 
 
 @pytest.fixture(scope="session")
+def pool_init_code_hash_lib(project, accounts):
+    return project.MockPoolInitCodeHash.deploy(sender=accounts[0])
+
+
+@pytest.fixture(scope="session")
 def position_lib(project, accounts):
     return project.MockPosition.deploy(sender=accounts[0])
 

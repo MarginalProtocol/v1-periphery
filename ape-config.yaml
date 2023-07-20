@@ -1,9 +1,10 @@
 name: v1-periphery
 
 plugins:
+  - name: alchemy
+  - name: etherscan
   - name: solidity
   - name: foundry
-    version: 0.6.8
 
 default_ecosystem: ethereum
 
@@ -11,6 +12,12 @@ ethereum:
   default_network: local
   local:
     default_provider: foundry
+
+foundry:
+  fork:
+    ethereum:
+      mainnet:
+        upstream_provider: alchemy
 
 dependencies:
   - name: openzeppelin
@@ -24,7 +31,7 @@ dependencies:
     ref: 0.8
   - name: marginal-v1-core
     local: ../v1-core
-    version: 1.0.0-beta.9
+    version: 1.0.0-beta.10
 
 solidity:
   runs: 200
@@ -33,4 +40,4 @@ solidity:
     - "@openzeppelin/contracts=openzeppelin/v4.8.3"
     - "@uniswap/v3-core/contracts=uniswap-v3-core/v0.8"
     - "@uniswap/v3-periphery/contracts=uniswap-v3-periphery/v0.8"
-    - "@marginal/v1-core/contracts=marginal-v1-core/v1.0.0-beta.9"
+    - "@marginal/v1-core/contracts=marginal-v1-core/v1.0.0-beta.10"
