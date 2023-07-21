@@ -19,6 +19,7 @@ import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV
 
 import {ISwapRouter} from "./interfaces/ISwapRouter.sol";
 import {LiquidityManagement} from "./base/LiquidityManagement.sol";
+import {PoolInitializer} from "./base/PoolInitializer.sol";
 import {PeripheryImmutableState} from "./base/PeripheryImmutableState.sol";
 import {PeripheryPaymentsWithFee} from "./base/PeripheryPaymentsWithFee.sol";
 
@@ -30,6 +31,7 @@ import {PoolAddress} from "./libraries/PoolAddress.sol";
 contract SwapRouter is
     ISwapRouter,
     PeripheryImmutableState,
+    PoolInitializer,
     LiquidityManagement,
     PeripheryValidation,
     PeripheryPaymentsWithFee,
