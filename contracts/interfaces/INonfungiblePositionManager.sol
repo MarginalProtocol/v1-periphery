@@ -32,6 +32,7 @@ interface INonfungiblePositionManager is IERC721 {
         address token0;
         address token1;
         uint24 maintenance;
+        address oracle;
         bool zeroForOne;
         uint128 sizeDesired;
         uint128 sizeMinimum;
@@ -51,6 +52,7 @@ interface INonfungiblePositionManager is IERC721 {
         address token0;
         address token1;
         uint24 maintenance;
+        address oracle;
         uint256 tokenId;
         uint128 marginIn;
         address recipient;
@@ -66,6 +68,7 @@ interface INonfungiblePositionManager is IERC721 {
         address token0;
         address token1;
         uint24 maintenance;
+        address oracle;
         uint256 tokenId;
         uint128 marginOut;
         address recipient;
@@ -81,6 +84,7 @@ interface INonfungiblePositionManager is IERC721 {
         address token0;
         address token1;
         uint24 maintenance;
+        address oracle;
         uint256 tokenId;
         address recipient;
         uint256 deadline;
@@ -95,6 +99,7 @@ interface INonfungiblePositionManager is IERC721 {
         address token0;
         address token1;
         uint24 maintenance;
+        address oracle;
         uint256 tokenId;
         address recipient;
         uint256 deadline;

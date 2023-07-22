@@ -7,9 +7,10 @@ contract MockPoolAddress {
     function getPoolKey(
         address tokenA,
         address tokenB,
-        uint24 maintenance
+        uint24 maintenance,
+        address oracle
     ) external pure returns (PoolAddress.PoolKey memory) {
-        return PoolAddress.getPoolKey(tokenA, tokenB, maintenance);
+        return PoolAddress.getPoolKey(tokenA, tokenB, maintenance, oracle);
     }
 
     function computeAddress(

@@ -53,18 +53,19 @@ contract SwapRouter is
         address _WETH9
     ) PeripheryImmutableState(_factory, _WETH9) {}
 
-    /// @dev Returns the pool for the given token pair and maintenance. The pool contract may or may not exist.
+    /// @dev Returns the pool for the given token pair, maintenance, and oracle. The pool contract may or may not exist.
     function getPool(
         address tokenA,
         address tokenB,
-        uint24 maintenance
+        uint24 maintenance,
+        address oracle
     ) private view returns (IMarginalV1Pool) {
         return
             IMarginalV1Pool(
                 PoolAddress.computeAddress(
                     deployer,
                     factory,
-                    PoolAddress.getPoolKey(tokenA, tokenB, maintenance)
+                    PoolAddress.getPoolKey(tokenA, tokenB, maintenance, oracle)
                 )
             );
     }
@@ -81,15 +82,19 @@ contract SwapRouter is
     ) external override {
         require(amount0Delta > 0 || amount1Delta > 0); // swaps entirely within 0-liquidity regions are not supported
         SwapCallbackData memory data = abi.decode(_data, (SwapCallbackData));
-        (address tokenIn, address tokenOut, uint24 maintenance) = data
-            .path
-            .decodeFirstPool();
+        (
+            address tokenIn,
+            address tokenOut,
+            uint24 maintenance,
+            address oracle
+        ) = data.path.decodeFirstPool();
         CallbackValidation.verifyCallback(
             deployer,
             factory,
             tokenIn,
             tokenOut,
-            maintenance
+            maintenance,
+            oracle
         );
 
         (bool isExactInput, uint256 amountToPay) = amount0Delta > 0
@@ -120,16 +125,20 @@ contract SwapRouter is
         // allow swapping to the router address with address 0
         if (recipient == address(0)) recipient = address(this);
 
-        (address tokenIn, address tokenOut, uint24 maintenance) = data
-            .path
-            .decodeFirstPool();
+        (
+            address tokenIn,
+            address tokenOut,
+            uint24 maintenance,
+            address oracle
+        ) = data.path.decodeFirstPool();
 
         bool zeroForOne = tokenIn < tokenOut;
 
         (int256 amount0, int256 amount1) = getPool(
             tokenIn,
             tokenOut,
-            maintenance
+            maintenance,
+            oracle
         ).swap(
                 recipient,
                 zeroForOne,
@@ -165,6 +174,7 @@ contract SwapRouter is
                 path: abi.encodePacked(
                     params.tokenIn,
                     params.maintenance,
+                    params.oracle,
                     params.tokenOut
                 ),
                 payer: msg.sender
@@ -222,16 +232,20 @@ contract SwapRouter is
         // allow swapping to the router address with address 0
         if (recipient == address(0)) recipient = address(this);
 
-        (address tokenOut, address tokenIn, uint24 maintenance) = data
-            .path
-            .decodeFirstPool();
+        (
+            address tokenOut,
+            address tokenIn,
+            uint24 maintenance,
+            address oracle
+        ) = data.path.decodeFirstPool();
 
         bool zeroForOne = tokenIn < tokenOut;
 
         (int256 amount0Delta, int256 amount1Delta) = getPool(
             tokenIn,
             tokenOut,
-            maintenance
+            maintenance,
+            oracle
         ).swap(
                 recipient,
                 zeroForOne,
@@ -274,6 +288,7 @@ contract SwapRouter is
                 path: abi.encodePacked(
                     params.tokenOut,
                     params.maintenance,
+                    params.oracle,
                     params.tokenIn
                 ),
                 payer: msg.sender
@@ -321,7 +336,8 @@ contract SwapRouter is
         (, uint160 sqrtPriceX96, , , , , , ) = getPool(
             params.token0,
             params.token1,
-            params.maintenance
+            params.maintenance,
+            params.oracle
         ).state();
         uint128 liquidityDelta = LiquidityAmounts.getLiquidityForAmounts(
             sqrtPriceX96,
@@ -334,6 +350,7 @@ contract SwapRouter is
                 token0: params.token0,
                 token1: params.token1,
                 maintenance: params.maintenance,
+                oracle: params.oracle,
                 recipient: params.recipient,
                 liquidityDelta: liquidityDelta,
                 amount0Min: params.amount0Min,
@@ -357,6 +374,7 @@ contract SwapRouter is
                 token0: params.token0,
                 token1: params.token1,
                 maintenance: params.maintenance,
+                oracle: params.oracle,
                 recipient: params.recipient,
                 shares: params.shares,
                 amount0Min: params.amount0Min,

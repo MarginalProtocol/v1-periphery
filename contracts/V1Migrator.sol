@@ -3,7 +3,7 @@ pragma solidity =0.8.15;
 
 import {TransferHelper} from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 import {IWETH9} from "@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol";
-import {INonfungiblePositionManager} from "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
+import {INonfungiblePositionManager as IUniswapV3NonfungiblePositionManager} from "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
 import {Multicall} from "@uniswap/v3-periphery/contracts/base/Multicall.sol";
 import {SelfPermit} from "@uniswap/v3-periphery/contracts/base/SelfPermit.sol";
 
@@ -48,9 +48,9 @@ contract V1Migrator is
         address spender,
         uint256 tokenId
     ) internal view returns (bool) {
-        INonfungiblePositionManager manager = INonfungiblePositionManager(
-            uniswapV3NonfungiblePositionManager
-        );
+        IUniswapV3NonfungiblePositionManager manager = IUniswapV3NonfungiblePositionManager(
+                uniswapV3NonfungiblePositionManager
+            );
         address owner = manager.ownerOf(tokenId);
         return (spender == owner ||
             manager.isApprovedForAll(owner, spender) ||
@@ -60,13 +60,13 @@ contract V1Migrator is
     function migrate(
         MigrateParams calldata params
     ) external onlyApprovedOrOwner(params.tokenId) {
-        INonfungiblePositionManager manager = INonfungiblePositionManager(
-            uniswapV3NonfungiblePositionManager
-        ); // uniswap v3
+        IUniswapV3NonfungiblePositionManager manager = IUniswapV3NonfungiblePositionManager(
+                uniswapV3NonfungiblePositionManager
+            ); // uniswap v3
         ISwapRouter router = ISwapRouter(marginalV1SwapRouter); // marginal v1
 
         manager.decreaseLiquidity(
-            INonfungiblePositionManager.DecreaseLiquidityParams({
+            IUniswapV3NonfungiblePositionManager.DecreaseLiquidityParams({
                 tokenId: params.tokenId,
                 liquidity: params.liquidityToMigrate,
                 amount0Min: params.amount0Min,
@@ -75,7 +75,7 @@ contract V1Migrator is
             })
         );
         (uint256 amount0, uint256 amount1) = manager.collect(
-            INonfungiblePositionManager.CollectParams({
+            IUniswapV3NonfungiblePositionManager.CollectParams({
                 tokenId: params.tokenId,
                 recipient: address(this),
                 amount0Max: type(uint128).max,
@@ -93,6 +93,7 @@ contract V1Migrator is
                     token0: params.token0,
                     token1: params.token1,
                     maintenance: params.maintenance,
+                    oracle: params.oracle,
                     recipient: params.recipient,
                     amount0Desired: amount0,
                     amount1Desired: amount1,

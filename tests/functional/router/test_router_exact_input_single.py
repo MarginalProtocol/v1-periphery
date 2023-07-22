@@ -18,6 +18,7 @@ def test_router_exact_input_single__updates_state(
 ):
     state = pool_initialized_with_liquidity.state()
     fee = pool_initialized_with_liquidity.fee()
+    oracle = pool_initialized_with_liquidity.oracle()
 
     token_in = (
         pool_initialized_with_liquidity.token0()
@@ -44,6 +45,7 @@ def test_router_exact_input_single__updates_state(
         token_in,
         token_out,
         maintenance,
+        oracle,
         alice.address,  # recipient
         deadline,
         amount_in,
@@ -94,6 +96,7 @@ def test_router_exact_input_single__transfers_funds(
 ):
     state = pool_initialized_with_liquidity.state()
     fee = pool_initialized_with_liquidity.fee()
+    oracle = pool_initialized_with_liquidity.oracle()
 
     token_in = (
         pool_initialized_with_liquidity.token0()
@@ -130,6 +133,7 @@ def test_router_exact_input_single__transfers_funds(
         token_in,
         token_out,
         maintenance,
+        oracle,
         alice.address,  # recipient
         deadline,
         amount_in,
@@ -200,6 +204,7 @@ def test_router_exact_input_single__returns_amount_out(
 ):
     state = pool_initialized_with_liquidity.state()
     fee = pool_initialized_with_liquidity.fee()
+    oracle = pool_initialized_with_liquidity.oracle()
 
     token_in = (
         pool_initialized_with_liquidity.token0()
@@ -226,6 +231,7 @@ def test_router_exact_input_single__returns_amount_out(
         token_in,
         token_out,
         maintenance,
+        oracle,
         alice.address,  # recipient
         deadline,
         amount_in,
@@ -260,6 +266,7 @@ def test_router_exact_input_single__reverts_when_past_deadline(
     zero_for_one,
 ):
     state = pool_initialized_with_liquidity.state()
+    oracle = pool_initialized_with_liquidity.oracle()
 
     token_in = (
         pool_initialized_with_liquidity.token0()
@@ -286,6 +293,7 @@ def test_router_exact_input_single__reverts_when_past_deadline(
         token_in,
         token_out,
         maintenance,
+        oracle,
         alice.address,  # recipient
         deadline,
         amount_in,
@@ -310,6 +318,7 @@ def test_router_exact_input_single__reverts_when_amount_out_less_than_min(
 ):
     state = pool_initialized_with_liquidity.state()
     fee = pool_initialized_with_liquidity.fee()
+    oracle = pool_initialized_with_liquidity.oracle()
 
     token_in = (
         pool_initialized_with_liquidity.token0()
@@ -350,6 +359,7 @@ def test_router_exact_input_single__reverts_when_amount_out_less_than_min(
         token_in,
         token_out,
         maintenance,
+        oracle,
         alice.address,  # recipient
         deadline,
         amount_in,

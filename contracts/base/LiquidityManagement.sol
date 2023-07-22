@@ -36,6 +36,7 @@ abstract contract LiquidityManagement is
         address token0;
         address token1;
         uint24 maintenance;
+        address oracle;
         address recipient;
         uint128 liquidityDelta;
         uint256 amount0Min;
@@ -49,7 +50,8 @@ abstract contract LiquidityManagement is
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
-            maintenance: params.maintenance
+            maintenance: params.maintenance,
+            oracle: params.oracle
         });
         IMarginalV1Pool pool = getPool(poolKey);
 
@@ -86,6 +88,7 @@ abstract contract LiquidityManagement is
         address token0;
         address token1;
         uint24 maintenance;
+        address oracle;
         address recipient;
         uint256 shares;
         uint256 amount0Min;
@@ -102,7 +105,8 @@ abstract contract LiquidityManagement is
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
-            maintenance: params.maintenance
+            maintenance: params.maintenance,
+            oracle: params.oracle
         });
         IMarginalV1Pool pool = getPool(poolKey);
 

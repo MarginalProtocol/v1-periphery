@@ -12,6 +12,7 @@ def test_router_swap_callback__reverts_when_not_pool_with_zero_for_one(
     spot_reserve1,
     token0,
     token1,
+    pool,
 ):
     amount0 = spot_reserve0 // 10000
     amount1 = spot_reserve1 // 10000
@@ -24,9 +25,11 @@ def test_router_swap_callback__reverts_when_not_pool_with_zero_for_one(
 
     payer = sender.address
     maintenance = 250000
+    oracle = pool.oracle()
 
     path = encode_packed(
-        ["address", "uint24", "address"], [token_in, maintenance, token_out]
+        ["address", "uint24", "address", "address"],
+        [token_in, maintenance, oracle, token_out],
     )
     data = encode(["(bytes,address)"], [(path, payer)])
 
@@ -43,6 +46,7 @@ def test_router_swap_callback__reverts_when_not_pool_with_one_for_zero(
     spot_reserve1,
     token0,
     token1,
+    pool,
 ):
     amount0 = spot_reserve0 // 10000
     amount1 = spot_reserve1 // 10000
@@ -55,9 +59,11 @@ def test_router_swap_callback__reverts_when_not_pool_with_one_for_zero(
 
     payer = sender.address
     maintenance = 250000
+    oracle = pool.oracle()
 
     path = encode_packed(
-        ["address", "uint24", "address"], [token_in, maintenance, token_out]
+        ["address", "uint24", "address", "address"],
+        [token_in, maintenance, oracle, token_out],
     )
     data = encode(["(bytes,address)"], [(path, payer)])
 

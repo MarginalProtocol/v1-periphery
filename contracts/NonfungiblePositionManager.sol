@@ -108,7 +108,8 @@ contract NonfungiblePositionManager is
             PoolAddress.PoolKey({
                 token0: params.token0,
                 token1: params.token1,
-                maintenance: params.maintenance
+                maintenance: params.maintenance,
+                oracle: params.oracle
             })
         );
 
@@ -127,6 +128,7 @@ contract NonfungiblePositionManager is
                 token0: params.token0,
                 token1: params.token1,
                 maintenance: params.maintenance,
+                oracle: params.oracle,
                 recipient: address(this),
                 zeroForOne: params.zeroForOne,
                 liquidityDelta: liquidityDelta,
@@ -172,7 +174,8 @@ contract NonfungiblePositionManager is
                     PoolAddress.PoolKey({
                         token0: params.token0,
                         token1: params.token1,
-                        maintenance: params.maintenance
+                        maintenance: params.maintenance,
+                        oracle: params.oracle
                     })
                 )
             ) != position.pool
@@ -183,6 +186,7 @@ contract NonfungiblePositionManager is
                 token0: params.token0,
                 token1: params.token1,
                 maintenance: params.maintenance,
+                oracle: params.oracle,
                 recipient: params.recipient,
                 id: position.id,
                 marginDelta: int128(params.marginIn)
@@ -210,7 +214,8 @@ contract NonfungiblePositionManager is
                     PoolAddress.PoolKey({
                         token0: params.token0,
                         token1: params.token1,
-                        maintenance: params.maintenance
+                        maintenance: params.maintenance,
+                        oracle: params.oracle
                     })
                 )
             ) != position.pool
@@ -221,6 +226,7 @@ contract NonfungiblePositionManager is
                 token0: params.token0,
                 token1: params.token1,
                 maintenance: params.maintenance,
+                oracle: params.oracle,
                 recipient: params.recipient,
                 id: position.id,
                 marginDelta: -int128(params.marginOut)
@@ -248,7 +254,8 @@ contract NonfungiblePositionManager is
                     PoolAddress.PoolKey({
                         token0: params.token0,
                         token1: params.token1,
-                        maintenance: params.maintenance
+                        maintenance: params.maintenance,
+                        oracle: params.oracle
                     })
                 )
             ) != position.pool
@@ -259,6 +266,7 @@ contract NonfungiblePositionManager is
                 token0: params.token0,
                 token1: params.token1,
                 maintenance: params.maintenance,
+                oracle: params.oracle,
                 recipient: params.recipient,
                 id: position.id
             })
@@ -293,7 +301,8 @@ contract NonfungiblePositionManager is
                     PoolAddress.PoolKey({
                         token0: params.token0,
                         token1: params.token1,
-                        maintenance: params.maintenance
+                        maintenance: params.maintenance,
+                        oracle: params.oracle
                     })
                 )
             ) != position.pool
@@ -304,6 +313,7 @@ contract NonfungiblePositionManager is
                 token0: params.token0,
                 token1: params.token1,
                 maintenance: params.maintenance,
+                oracle: params.oracle,
                 recipient: params.recipient,
                 owner: address(this),
                 id: position.id

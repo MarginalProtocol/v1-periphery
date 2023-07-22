@@ -16,6 +16,7 @@ interface IV1Migrator is IMulticall, ISelfPermit, IPoolInitializer {
         address token0;
         address token1;
         uint24 maintenance;
+        address oracle;
         uint256 amount0Min;
         uint256 amount1Min;
         address recipient;

@@ -10,11 +10,13 @@ import "../interfaces/IPeripheryImmutableState.sol";
 abstract contract PeripheryImmutableState is IPeripheryImmutableState {
     address public immutable factory;
     address public immutable deployer;
+    address public immutable uniswapV3Factory;
     address public immutable WETH9;
 
     constructor(address _factory, address _WETH9) {
         factory = _factory;
         deployer = IMarginalV1Factory(_factory).marginalV1Deployer();
+        uniswapV3Factory = IMarginalV1Factory(_factory).uniswapV3Factory();
         WETH9 = _WETH9;
     }
 }

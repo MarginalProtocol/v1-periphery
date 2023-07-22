@@ -17,6 +17,7 @@ def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
     def mint(zero_for_one: bool) -> int:
         state = pool_initialized_with_liquidity.state()
         maintenance = pool_initialized_with_liquidity.maintenance()
+        oracle = pool_initialized_with_liquidity.oracle()
 
         sqrt_price_limit_x96 = (
             MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
@@ -36,6 +37,7 @@ def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
             pool_initialized_with_liquidity.token0(),
             pool_initialized_with_liquidity.token1(),
             maintenance,
+            oracle,
             zero_for_one,
             size,
             size_min,
@@ -104,6 +106,7 @@ def test_manager_grab__liquidates_position(
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
+        pool_initialized_with_liquidity.oracle(),
         token_id,
         alice.address,
         deadline,
@@ -155,6 +158,7 @@ def test_manager_grab__transfers_funds(
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
+        pool_initialized_with_liquidity.oracle(),
         token_id,
         alice.address,
         deadline,
@@ -195,6 +199,7 @@ def test_manager_grab__emits_grab(
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
+        pool_initialized_with_liquidity.oracle(),
         token_id,
         alice.address,
         deadline,
@@ -228,6 +233,7 @@ def test_manager_grab__reverts_when_past_deadline(
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
+        pool_initialized_with_liquidity.oracle(),
         token_id,
         alice.address,
         deadline,
@@ -258,6 +264,7 @@ def test_manager_grab__reverts_when_invalid_pool_key(
         rando_token_a_address,
         pool_initialized_with_liquidity.token1(),
         pool_initialized_with_liquidity.maintenance(),
+        pool_initialized_with_liquidity.oracle(),
         token_id,
         alice.address,
         deadline,

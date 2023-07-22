@@ -40,6 +40,7 @@ abstract contract PositionManagement is
         address token0;
         address token1;
         uint24 maintenance;
+        address oracle;
         address recipient;
         bool zeroForOne;
         uint128 liquidityDelta;
@@ -56,7 +57,8 @@ abstract contract PositionManagement is
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
-            maintenance: params.maintenance
+            maintenance: params.maintenance,
+            oracle: params.oracle
         });
         IMarginalV1Pool pool = getPool(poolKey);
 
@@ -95,6 +97,7 @@ abstract contract PositionManagement is
         address token0;
         address token1;
         uint24 maintenance;
+        address oracle;
         address recipient;
         uint96 id;
         int128 marginDelta;
@@ -107,7 +110,8 @@ abstract contract PositionManagement is
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
-            maintenance: params.maintenance
+            maintenance: params.maintenance,
+            oracle: params.oracle
         });
         IMarginalV1Pool pool = getPool(poolKey);
 
@@ -142,6 +146,7 @@ abstract contract PositionManagement is
         address token0;
         address token1;
         uint24 maintenance;
+        address oracle;
         address recipient;
         uint96 id;
     }
@@ -153,7 +158,8 @@ abstract contract PositionManagement is
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
-            maintenance: params.maintenance
+            maintenance: params.maintenance,
+            oracle: params.oracle
         });
         IMarginalV1Pool pool = getPool(poolKey);
 
@@ -198,6 +204,7 @@ abstract contract PositionManagement is
         address token0;
         address token1;
         uint24 maintenance;
+        address oracle;
         address recipient;
         address owner;
         uint96 id;
@@ -210,7 +217,8 @@ abstract contract PositionManagement is
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
-            maintenance: params.maintenance
+            maintenance: params.maintenance,
+            oracle: params.oracle
         });
         IMarginalV1Pool pool = getPool(poolKey);
 

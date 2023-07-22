@@ -23,6 +23,7 @@ interface ISwapRouter is IMarginalV1MintCallback, IMarginalV1SwapCallback {
         address tokenIn;
         address tokenOut;
         uint24 maintenance;
+        address oracle;
         address recipient;
         uint256 deadline;
         uint256 amountIn;
@@ -56,6 +57,7 @@ interface ISwapRouter is IMarginalV1MintCallback, IMarginalV1SwapCallback {
         address tokenIn;
         address tokenOut;
         uint24 maintenance;
+        address oracle;
         address recipient;
         uint256 deadline;
         uint256 amountOut;
@@ -101,6 +103,7 @@ interface ISwapRouter is IMarginalV1MintCallback, IMarginalV1SwapCallback {
         address token0;
         address token1;
         uint24 maintenance;
+        address oracle;
         address recipient;
         uint256 amount0Desired;
         uint256 amount1Desired;
@@ -125,6 +128,7 @@ interface ISwapRouter is IMarginalV1MintCallback, IMarginalV1SwapCallback {
         address token0;
         address token1;
         uint24 maintenance;
+        address oracle;
         address recipient;
         uint256 shares;
         uint256 amount0Min;

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity =0.8.15;
 
+import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import {PoolAddress as UniswapV3PoolAddress} from "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
+
 import {IMarginalV1Factory} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Factory.sol";
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
 
@@ -20,7 +23,20 @@ abstract contract PoolInitializer is IPoolInitializer, PeripheryImmutableState {
         uint160 sqrtPriceX96
     ) external payable override returns (address pool) {
         require(token0 < token1);
-        pool = IMarginalV1Factory(factory).getPool(token0, token1, maintenance);
+        address oracle = UniswapV3PoolAddress.computeAddress(
+            uniswapV3Factory,
+            UniswapV3PoolAddress.PoolKey({
+                token0: token0,
+                token1: token1,
+                fee: uniswapV3Fee
+            })
+        );
+        pool = IMarginalV1Factory(factory).getPool(
+            token0,
+            token1,
+            maintenance,
+            oracle
+        );
 
         if (pool == address(0)) {
             pool = IMarginalV1Factory(factory).createPool(

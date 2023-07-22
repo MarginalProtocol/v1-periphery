@@ -15,19 +15,21 @@ library CallbackValidation {
     /// @param tokenA The contract address of either token0 or token1
     /// @param tokenB The contract address of the other token
     /// @param maintenance The maintenance requirements of the pool
+    /// @param oracle The contract address of the oracle referenced by the pool
     /// @return pool The V1 pool contract address
     function verifyCallback(
         address deployer,
         address factory,
         address tokenA,
         address tokenB,
-        uint24 maintenance
+        uint24 maintenance,
+        address oracle
     ) internal view returns (IMarginalV1Pool pool) {
         return
             verifyCallback(
                 deployer,
                 factory,
-                PoolAddress.getPoolKey(tokenA, tokenB, maintenance)
+                PoolAddress.getPoolKey(tokenA, tokenB, maintenance, oracle)
             );
     }
 

@@ -3,6 +3,8 @@ pragma solidity >=0.6.0;
 
 import "@uniswap/v3-periphery/contracts/libraries/BytesLib.sol";
 
+// TODO: test for updates with oracle in pool key
+
 /// @title Functions for manipulating path data for multihop swaps
 /// @dev Fork of Uniswap V3 periphery Path.sol
 library Path {
@@ -13,8 +15,9 @@ library Path {
     /// @dev The length of the bytes encoded maintenance
     uint256 private constant MAINTENANCE_SIZE = 3;
 
-    /// @dev The offset of a single token address and pool maintenance
-    uint256 private constant NEXT_OFFSET = ADDR_SIZE + MAINTENANCE_SIZE;
+    /// @dev The offset of a single token address, pool maintenance, and oracle
+    uint256 private constant NEXT_OFFSET =
+        ADDR_SIZE + MAINTENANCE_SIZE + ADDR_SIZE;
     /// @dev The offset of an encoded pool key
     uint256 private constant POP_OFFSET = NEXT_OFFSET + ADDR_SIZE;
     /// @dev The minimum length of an encoding that contains 2 or more pools
@@ -41,15 +44,22 @@ library Path {
     /// @return tokenA The first token of the given pool
     /// @return tokenB The second token of the given pool
     /// @return maintenance The maintenance level of the pool
+    /// @return oracle The oracle referenced by the given pool
     function decodeFirstPool(
         bytes memory path
     )
         internal
         pure
-        returns (address tokenA, address tokenB, uint24 maintenance)
+        returns (
+            address tokenA,
+            address tokenB,
+            uint24 maintenance,
+            address oracle
+        )
     {
         tokenA = path.toAddress(0);
         maintenance = path.toUint24(ADDR_SIZE);
+        oracle = path.toAddress(ADDR_SIZE + MAINTENANCE_SIZE);
         tokenB = path.toAddress(NEXT_OFFSET);
     }
 

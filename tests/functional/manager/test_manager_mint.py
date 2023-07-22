@@ -26,6 +26,7 @@ def test_manager_mint__opens_position(
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
+    oracle = pool_initialized_with_liquidity.oracle()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
     (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
@@ -68,6 +69,7 @@ def test_manager_mint__opens_position(
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         maintenance,
+        oracle,
         zero_for_one,
         size,
         size_min,
@@ -96,6 +98,7 @@ def test_manager_mint__mints_token(
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
+    oracle = pool_initialized_with_liquidity.oracle()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
     (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
@@ -113,6 +116,7 @@ def test_manager_mint__mints_token(
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         maintenance,
+        oracle,
         zero_for_one,
         size,
         size_min,
@@ -139,6 +143,7 @@ def test_manager_mint__sets_position_ref(
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
+    oracle = pool_initialized_with_liquidity.oracle()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
     (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
@@ -156,6 +161,7 @@ def test_manager_mint__sets_position_ref(
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         maintenance,
+        oracle,
         zero_for_one,
         size,
         size_min,
@@ -192,6 +198,7 @@ def test_manager_mint__transfers_funds(
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
+    oracle = pool_initialized_with_liquidity.oracle()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
     (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
@@ -213,6 +220,7 @@ def test_manager_mint__transfers_funds(
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         maintenance,
+        oracle,
         zero_for_one,
         size,
         size_min,
@@ -250,6 +258,7 @@ def test_manager_mint__emits_mint(
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
+    oracle = pool_initialized_with_liquidity.oracle()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
     (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
@@ -267,6 +276,7 @@ def test_manager_mint__emits_mint(
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         maintenance,
+        oracle,
         zero_for_one,
         size,
         size_min,
@@ -297,10 +307,15 @@ def test_manager_mint__emits_mint(
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
 def test_manager_mint__when_sqrt_price_limit_x96_is_zero(
-    pool_initialized_with_liquidity, manager, zero_for_one, sender, chain
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    chain,
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
+    oracle = pool_initialized_with_liquidity.oracle()
 
     sqrt_price_limit_x96 = 0
     (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
@@ -318,6 +333,7 @@ def test_manager_mint__when_sqrt_price_limit_x96_is_zero(
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         maintenance,
+        oracle,
         zero_for_one,
         size,
         size_min,
@@ -333,10 +349,15 @@ def test_manager_mint__when_sqrt_price_limit_x96_is_zero(
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
 def test_manager_mint__when_debt_max_is_zero(
-    pool_initialized_with_liquidity, manager, zero_for_one, sender, chain
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    chain,
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
+    oracle = pool_initialized_with_liquidity.oracle()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
     (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
@@ -354,6 +375,7 @@ def test_manager_mint__when_debt_max_is_zero(
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         maintenance,
+        oracle,
         zero_for_one,
         size,
         size_min,
@@ -383,6 +405,7 @@ def test_manager_mint__reverts_when_past_deadline(
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
+    oracle = pool_initialized_with_liquidity.oracle()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
     (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
@@ -400,6 +423,7 @@ def test_manager_mint__reverts_when_past_deadline(
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         maintenance,
+        oracle,
         zero_for_one,
         size,
         size_min,
@@ -427,6 +451,7 @@ def test_manager_mint__reverts_when_size_less_than_min(
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
+    oracle = pool_initialized_with_liquidity.oracle()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
     (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
@@ -462,6 +487,7 @@ def test_manager_mint__reverts_when_size_less_than_min(
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         maintenance,
+        oracle,
         zero_for_one,
         size,
         size_min,
@@ -489,6 +515,7 @@ def test_manager_mint__reverts_when_debt_greater_than_max(
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
+    oracle = pool_initialized_with_liquidity.oracle()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
     (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
@@ -525,6 +552,7 @@ def test_manager_mint__reverts_when_debt_greater_than_max(
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
         maintenance,
+        oracle,
         zero_for_one,
         size,
         size_min,
