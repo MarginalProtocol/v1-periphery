@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity =0.8.15;
 
+import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import {PoolAddress as UniswapV3PoolAddress} from "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
 
@@ -52,6 +53,49 @@ abstract contract PoolInitializer is IPoolInitializer, PeripheryImmutableState {
             if (sqrtPriceX96Existing == 0) {
                 IMarginalV1Pool(pool).initialize(sqrtPriceX96);
             }
+        }
+    }
+
+    // TODO: test
+    /// @inheritdoc IPoolInitializer
+    function initializeOracleIfNecessary(
+        address token0,
+        address token1,
+        uint24 maintenance,
+        uint24 uniswapV3Fee,
+        uint16 observationCardinalityNext
+    ) external override {
+        require(token0 < token1);
+        address oracle = UniswapV3PoolAddress.computeAddress(
+            uniswapV3Factory,
+            UniswapV3PoolAddress.PoolKey({
+                token0: token0,
+                token1: token1,
+                fee: uniswapV3Fee
+            })
+        );
+        (
+            ,
+            ,
+            ,
+            ,
+            uint16 observationCardinalityNextExisting,
+            ,
+
+        ) = IUniswapV3Pool(oracle).slot0();
+        uint16 observationCardinalityMinimum = IMarginalV1Factory(factory)
+            .observationCardinalityMinimum();
+        require(
+            observationCardinalityNextExisting < observationCardinalityNext &&
+                observationCardinalityMinimum < observationCardinalityNext
+        );
+
+        if (
+            observationCardinalityNextExisting < observationCardinalityMinimum
+        ) {
+            IUniswapV3Pool(oracle).increaseObservationCardinalityNext(
+                observationCardinalityNext
+            );
         }
     }
 }
