@@ -247,3 +247,8 @@ def position_amounts_lib(project, accounts):
 @pytest.fixture(scope="session")
 def callback_validation_lib(project, accounts):
     return project.MockCallbackValidation.deploy(sender=accounts[0])
+
+
+@pytest.fixture(scope="session")
+def path_lib(project, accounts):
+    return project.MockPath.deploy(sender=accounts[0])

@@ -3,8 +3,6 @@ pragma solidity >=0.6.0;
 
 import "@uniswap/v3-periphery/contracts/libraries/BytesLib.sol";
 
-// TODO: test for updates with oracle in pool key
-
 /// @title Functions for manipulating path data for multihop swaps
 /// @dev Fork of Uniswap V3 periphery Path.sol
 library Path {
@@ -72,9 +70,9 @@ library Path {
         return path.slice(0, POP_OFFSET);
     }
 
-    /// @notice Skips a token + maintenance element from the buffer and returns the remainder
+    /// @notice Skips a token + maintenance + oracle element from the buffer and returns the remainder
     /// @param path The swap path
-    /// @return The remaining token + maintenance elements in the path
+    /// @return The remaining token + maintenance + oracle elements in the path
     function skipToken(bytes memory path) internal pure returns (bytes memory) {
         return path.slice(NEXT_OFFSET, path.length - NEXT_OFFSET);
     }
