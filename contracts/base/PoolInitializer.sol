@@ -3,7 +3,6 @@ pragma solidity =0.8.15;
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
-import {PoolAddress as UniswapV3PoolAddress} from "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
 
 import {IMarginalV1Factory} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Factory.sol";
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
@@ -14,6 +13,8 @@ import {IPoolInitializer} from "../interfaces/IPoolInitializer.sol";
 /// @title Creates and initializes V1 Pools
 /// @dev Fork of Uniswap V3 periphery PoolInitializer.sol, adapted to Marginal V1
 abstract contract PoolInitializer is IPoolInitializer, PeripheryImmutableState {
+    error InvalidOracle();
+
     // TODO: test
     /// @inheritdoc IPoolInitializer
     function createAndInitializePoolIfNecessary(
@@ -24,21 +25,19 @@ abstract contract PoolInitializer is IPoolInitializer, PeripheryImmutableState {
         uint160 sqrtPriceX96
     ) external payable override returns (address pool) {
         require(token0 < token1);
-        address oracle = UniswapV3PoolAddress.computeAddress(
-            uniswapV3Factory,
-            UniswapV3PoolAddress.PoolKey({
-                token0: token0,
-                token1: token1,
-                fee: uniswapV3Fee
-            })
+        address oracle = IUniswapV3Factory(uniswapV3Factory).getPool(
+            token0,
+            token1,
+            uniswapV3Fee
         );
+        if (oracle == address(0)) revert InvalidOracle();
+
         pool = IMarginalV1Factory(factory).getPool(
             token0,
             token1,
             maintenance,
             oracle
         );
-
         if (pool == address(0)) {
             pool = IMarginalV1Factory(factory).createPool(
                 token0,
@@ -66,14 +65,13 @@ abstract contract PoolInitializer is IPoolInitializer, PeripheryImmutableState {
         uint16 observationCardinalityNext
     ) external override {
         require(token0 < token1);
-        address oracle = UniswapV3PoolAddress.computeAddress(
-            uniswapV3Factory,
-            UniswapV3PoolAddress.PoolKey({
-                token0: token0,
-                token1: token1,
-                fee: uniswapV3Fee
-            })
+        address oracle = IUniswapV3Factory(uniswapV3Factory).getPool(
+            token0,
+            token1,
+            uniswapV3Fee
         );
+        if (oracle == address(0)) revert InvalidOracle();
+
         (
             ,
             ,
