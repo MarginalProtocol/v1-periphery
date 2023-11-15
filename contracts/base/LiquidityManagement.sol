@@ -26,10 +26,7 @@ abstract contract LiquidityManagement is
     function getPool(
         PoolAddress.PoolKey memory poolKey
     ) internal view returns (IMarginalV1Pool) {
-        return
-            IMarginalV1Pool(
-                PoolAddress.computeAddress(deployer, factory, poolKey)
-            );
+        return IMarginalV1Pool(PoolAddress.getAddress(factory, poolKey));
     }
 
     struct MintParams {
@@ -76,7 +73,7 @@ abstract contract LiquidityManagement is
             data,
             (LiquidityCallbackData)
         );
-        CallbackValidation.verifyCallback(deployer, factory, decoded.poolKey);
+        CallbackValidation.verifyCallback(factory, decoded.poolKey);
 
         if (amount0Owed > 0)
             pay(decoded.poolKey.token0, decoded.payer, msg.sender, amount0Owed);

@@ -8,7 +8,6 @@ import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV
 
 contract MockCallbackValidation {
     function verifyCallback(
-        address deployer,
         address factory,
         address tokenA,
         address tokenB,
@@ -17,7 +16,6 @@ contract MockCallbackValidation {
     ) external view returns (IMarginalV1Pool pool) {
         return
             CallbackValidation.verifyCallback(
-                deployer,
                 factory,
                 tokenA,
                 tokenB,
@@ -27,10 +25,9 @@ contract MockCallbackValidation {
     }
 
     function verifyCallback(
-        address deployer,
         address factory,
         PoolAddress.PoolKey memory poolKey
     ) external view returns (IMarginalV1Pool pool) {
-        return CallbackValidation.verifyCallback(deployer, factory, poolKey);
+        return CallbackValidation.verifyCallback(factory, poolKey);
     }
 }

@@ -15,7 +15,9 @@ import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV
 contract TestMarginalV1PoolCallee is
     IMarginalV1AdjustCallback,
     IMarginalV1MintCallback,
-    IMarginalV1OpenCallback
+    IMarginalV1OpenCallback,
+    IMarginalV1SettleCallback,
+    IMarginalV1SwapCallback
 {
     using SafeERC20 for IERC20;
 

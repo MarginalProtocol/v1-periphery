@@ -7,7 +7,7 @@ contract MockLiquidityMath {
     function toAmounts(
         uint128 liquidity,
         uint160 sqrtPriceX96
-    ) external view returns (uint128 amount0, uint128 amount1) {
+    ) external view returns (uint256 amount0, uint256 amount1) {
         (amount0, amount1) = LiquidityMath.toAmounts(liquidity, sqrtPriceX96);
     }
 

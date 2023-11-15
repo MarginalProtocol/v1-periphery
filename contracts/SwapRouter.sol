@@ -62,8 +62,7 @@ contract SwapRouter is
     ) private view returns (IMarginalV1Pool) {
         return
             IMarginalV1Pool(
-                PoolAddress.computeAddress(
-                    deployer,
+                PoolAddress.getAddress(
                     factory,
                     PoolAddress.getPoolKey(tokenA, tokenB, maintenance, oracle)
                 )
@@ -89,7 +88,6 @@ contract SwapRouter is
             address oracle
         ) = data.path.decodeFirstPool();
         CallbackValidation.verifyCallback(
-            deployer,
             factory,
             tokenIn,
             tokenOut,

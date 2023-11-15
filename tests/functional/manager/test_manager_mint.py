@@ -44,6 +44,7 @@ def test_manager_mint__opens_position(
         state.liquidity, state.sqrtPriceX96, maintenance, zero_for_one, size
     )  # ~ 5% for 1% size
 
+    block_timestamp_next = chain.pending_timestamp
     tick_cumulative = state.tickCumulative + state.tick * (
         chain.pending_timestamp - state.blockTimestamp
     )
@@ -59,6 +60,7 @@ def test_manager_mint__opens_position(
         liquidity_delta,
         zero_for_one,
         state.tick,
+        block_timestamp_next,
         tick_cumulative,
         oracle_tick_cumulative,
     )
@@ -480,6 +482,7 @@ def test_manager_mint__reverts_when_size_less_than_min(
         state.tick,
         0,
         0,
+        0,
     )
     size_min = position.size + 1
 
@@ -542,6 +545,7 @@ def test_manager_mint__reverts_when_debt_greater_than_max(
         liquidity_delta,
         zero_for_one,
         state.tick,
+        0,
         0,
         0,
     )

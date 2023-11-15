@@ -70,6 +70,7 @@ contract NonfungiblePositionManager is
             bool zeroForOne,
             bool liquidated,
             int56 tick,
+            uint32 blockTimestamp,
             int56 tickCumulativeDelta,
             uint128 margin,
             uint128 liquidityLocked
@@ -79,6 +80,7 @@ contract NonfungiblePositionManager is
         pool = position.pool;
         positionId = position.id;
 
+        // TODO: sync for funding
         bytes32 key = keccak256(abi.encodePacked(address(this), positionId));
         (
             size,
@@ -89,6 +91,7 @@ contract NonfungiblePositionManager is
             zeroForOne,
             liquidated,
             tick,
+            blockTimestamp,
             tickCumulativeDelta,
             margin,
             liquidityLocked

@@ -187,6 +187,18 @@ def pool(mock_univ3_pool, create_pool):
     )
 
 
+# TODO: maintenance parameterization
+@pytest.fixture(scope="session")
+def rando_pool(rando_univ3_pool, create_pool):
+    maintenance = 250000
+    return create_pool(
+        rando_univ3_pool.token0(),
+        rando_univ3_pool.token1(),
+        maintenance,
+        rando_univ3_pool.fee(),
+    )
+
+
 @pytest.fixture(scope="session")
 def callee(project, accounts):
     return project.TestMarginalV1PoolCallee.deploy(sender=accounts[0])

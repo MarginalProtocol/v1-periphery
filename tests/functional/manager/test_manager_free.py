@@ -7,6 +7,7 @@ from utils.constants import (
     MAX_SQRT_RATIO,
     MAINTENANCE_UNIT,
     FUNDING_PERIOD,
+    TICK_CUMULATIVE_RATE_MAX,
 )
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
 
@@ -71,6 +72,7 @@ def test_manager_free__adjusts_position(
     key = get_position_key(manager.address, position_id)
     position = pool_initialized_with_liquidity.positions(key)
 
+    block_timestamp_next = chain.pending_timestamp
     deadline = chain.pending_timestamp + 3600
     margin_out = (position.margin * 5) // 100
     free_params = (
@@ -88,8 +90,14 @@ def test_manager_free__adjusts_position(
     state = pool_initialized_with_liquidity.state()
     tick_cumulative_last = state.tickCumulative
     oracle_tick_cumulatives, _ = mock_univ3_pool.observe([0])
+
     position = position_lib.sync(
-        position, tick_cumulative_last, oracle_tick_cumulatives[0], FUNDING_PERIOD
+        position,
+        block_timestamp_next,
+        tick_cumulative_last,
+        oracle_tick_cumulatives[0],
+        TICK_CUMULATIVE_RATE_MAX,
+        FUNDING_PERIOD,
     )
 
     position.margin -= margin_out
@@ -270,6 +278,7 @@ def test_manager_free__reverts_when_past_deadline(
 @pytest.mark.parametrize("zero_for_one", [True, False])
 def test_manager_free__reverts_when_invalid_pool_key(
     pool_initialized_with_liquidity,
+    rando_pool,
     manager,
     zero_for_one,
     sender,
@@ -287,10 +296,10 @@ def test_manager_free__reverts_when_invalid_pool_key(
     deadline = chain.pending_timestamp + 3600
     margin_out = (position.margin * 5) // 100
     free_params = (
-        rando_token_a_address,
-        pool_initialized_with_liquidity.token1(),
-        pool_initialized_with_liquidity.maintenance(),
-        pool_initialized_with_liquidity.oracle(),
+        rando_pool.token0(),
+        rando_pool.token1(),
+        rando_pool.maintenance(),
+        rando_pool.oracle(),
         token_id,
         margin_out,
         alice.address,

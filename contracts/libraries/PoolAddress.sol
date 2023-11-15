@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity >=0.5.0;
 
+import {IMarginalV1Factory} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Factory.sol";
+
 /// @dev Fork of Uniswap V3 periphery PoolAddress.sol
 library PoolAddress {
-    bytes32 internal constant POOL_INIT_CODE_HASH =
-        0x02a1616b485b386fad7ec56099103dcb4146ca03162b19719a93a98f0f7f059f;
+    error PoolInactive();
 
     /// @notice The identifying key of the pool
     struct PoolKey {
@@ -36,38 +37,21 @@ library PoolAddress {
             });
     }
 
-    /// @notice Deterministically computes the pool address given the factory and PoolKey
-    /// @param deployer The deployer contract address
+    /// @notice Gets the pool address from factory given pool key
+    /// @dev Reverts if pool not created yet
     /// @param factory The factory contract address
-    /// @param key The PoolKey
+    /// @param key The pool key
     /// @return pool The contract address of the pool
-    function computeAddress(
-        address deployer,
+    function getAddress(
         address factory,
         PoolKey memory key
-    ) internal pure returns (address pool) {
-        require(key.token0 < key.token1);
-        pool = address(
-            uint160(
-                uint256(
-                    keccak256(
-                        abi.encodePacked(
-                            hex"ff",
-                            deployer,
-                            keccak256(
-                                abi.encode(
-                                    factory,
-                                    key.token0,
-                                    key.token1,
-                                    key.maintenance,
-                                    key.oracle
-                                )
-                            ),
-                            POOL_INIT_CODE_HASH
-                        )
-                    )
-                )
-            )
+    ) internal view returns (address pool) {
+        pool = IMarginalV1Factory(factory).getPool(
+            key.token0,
+            key.token1,
+            key.maintenance,
+            key.oracle
         );
+        if (pool == address(0)) revert PoolInactive();
     }
 }

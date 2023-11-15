@@ -30,10 +30,7 @@ abstract contract PositionManagement is
     function getPool(
         PoolAddress.PoolKey memory poolKey
     ) internal view returns (IMarginalV1Pool) {
-        return
-            IMarginalV1Pool(
-                PoolAddress.computeAddress(deployer, factory, poolKey)
-            );
+        return IMarginalV1Pool(PoolAddress.getAddress(factory, poolKey));
     }
 
     struct OpenParams {
@@ -85,7 +82,7 @@ abstract contract PositionManagement is
             data,
             (PositionCallbackData)
         );
-        CallbackValidation.verifyCallback(deployer, factory, decoded.poolKey);
+        CallbackValidation.verifyCallback(factory, decoded.poolKey);
 
         if (amount0Owed > 0)
             pay(decoded.poolKey.token0, decoded.payer, msg.sender, amount0Owed);
@@ -134,7 +131,7 @@ abstract contract PositionManagement is
             data,
             (PositionCallbackData)
         );
-        CallbackValidation.verifyCallback(deployer, factory, decoded.poolKey);
+        CallbackValidation.verifyCallback(factory, decoded.poolKey);
 
         if (amount0Owed > 0)
             pay(decoded.poolKey.token0, decoded.payer, msg.sender, amount0Owed);
@@ -182,7 +179,7 @@ abstract contract PositionManagement is
             data,
             (PositionCallbackData)
         );
-        CallbackValidation.verifyCallback(deployer, factory, decoded.poolKey);
+        CallbackValidation.verifyCallback(factory, decoded.poolKey);
 
         if (amount0Delta > 0)
             pay(

@@ -23,6 +23,7 @@ interface INonfungiblePositionManager is IERC721 {
             bool zeroForOne,
             bool liquidated,
             int56 tick,
+            uint32 blockTimestamp,
             int56 tickCumulativeDelta,
             uint128 margin,
             uint128 liquidityLocked

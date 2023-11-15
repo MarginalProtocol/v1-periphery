@@ -8,7 +8,7 @@ import {LiquidityMath} from "@marginal/v1-core/contracts/libraries/LiquidityMath
 library PositionAmounts {
     using SafeCast for uint256;
 
-    error SizeGreaterThanReserve(uint128 reserve);
+    error SizeGreaterThanReserve(uint256 reserve);
 
     function getLiquidityForSize(
         uint128 liquidity,
@@ -18,15 +18,15 @@ library PositionAmounts {
         uint128 size
     ) internal pure returns (uint128 liquidityDelta) {
         // del L / L = (sx / x) / (1 - (1 - sx / x) ** 2 / (1 + M))
-        (uint128 reserve0, uint128 reserve1) = LiquidityMath.toAmounts(
+        (uint256 reserve0, uint256 reserve1) = LiquidityMath.toAmounts(
             liquidity,
             sqrtPriceX96
         );
-        uint128 reserve = !zeroForOne ? reserve0 : reserve1;
+        uint256 reserve = !zeroForOne ? reserve0 : reserve1;
         if (size >= reserve) revert SizeGreaterThanReserve(reserve);
 
-        uint256 prod = uint256(reserve - size) ** 2 / uint256(reserve);
-        uint256 denom = uint256(reserve) - (prod * 1e6) / (1e6 + maintenance);
+        uint256 prod = (reserve - uint256(size)) ** 2 / reserve;
+        uint256 denom = reserve - (prod * 1e6) / (1e6 + maintenance);
         liquidityDelta = ((uint256(liquidity) * uint256(size)) / denom)
             .toUint128();
     }

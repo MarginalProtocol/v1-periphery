@@ -13,15 +13,10 @@ contract MockPoolAddress {
         return PoolAddress.getPoolKey(tokenA, tokenB, maintenance, oracle);
     }
 
-    function computeAddress(
-        address deployer,
+    function getAddress(
         address factory,
         PoolAddress.PoolKey memory key
-    ) external pure returns (address) {
-        return PoolAddress.computeAddress(deployer, factory, key);
-    }
-
-    function POOL_INIT_CODE_HASH() external pure returns (bytes32) {
-        return PoolAddress.POOL_INIT_CODE_HASH;
+    ) external view returns (address) {
+        return PoolAddress.getAddress(factory, key);
     }
 }
