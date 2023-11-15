@@ -11,6 +11,7 @@ import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV
 
 import {PeripheryImmutableState} from "./base/PeripheryImmutableState.sol";
 import {PositionManagement} from "./base/PositionManagement.sol";
+import {PositionState} from "./base/PositionState.sol";
 import {PoolAddress} from "./libraries/PoolAddress.sol";
 import {PositionAmounts} from "./libraries/PositionAmounts.sol";
 import {INonfungiblePositionManager} from "./interfaces/INonfungiblePositionManager.sol";
@@ -21,6 +22,7 @@ contract NonfungiblePositionManager is
     ERC721,
     PeripheryImmutableState,
     PositionManagement,
+    PositionState,
     PeripheryValidation
 {
     struct Position {
@@ -53,7 +55,8 @@ contract NonfungiblePositionManager is
         PeripheryImmutableState(_factory, _WETH9)
     {}
 
-    // TODO: check for re-entrancy view issues and warn @dev if so
+    /// @dev Do *NOT* use in callback. Vulnerable to re-entrancy view issues.
+    // TODO: check re-entrancy issues
     function positions(
         uint256 tokenId
     )
@@ -62,40 +65,23 @@ contract NonfungiblePositionManager is
         returns (
             address pool,
             uint96 positionId,
-            uint128 size,
-            uint128 debt0,
-            uint128 debt1,
-            uint128 insurance0,
-            uint128 insurance1,
+            address owner,
             bool zeroForOne,
-            bool liquidated,
-            int56 tick,
-            uint32 blockTimestamp,
-            int56 tickCumulativeDelta,
+            uint128 size,
+            uint128 debt,
             uint128 margin,
-            uint128 liquidityLocked
+            bool liquidated
         )
     {
         Position memory position = _positions[tokenId];
         pool = position.pool;
         positionId = position.id;
-
-        // TODO: sync for funding
-        bytes32 key = keccak256(abi.encodePacked(address(this), positionId));
-        (
-            size,
-            debt0,
-            debt1,
-            insurance0,
-            insurance1,
-            zeroForOne,
-            liquidated,
-            tick,
-            blockTimestamp,
-            tickCumulativeDelta,
-            margin,
-            liquidityLocked
-        ) = IMarginalV1Pool(pool).positions(key);
+        owner = ownerOf(tokenId);
+        (zeroForOne, size, debt, margin, liquidated) = getPositionSynced(
+            pool,
+            address(this),
+            positionId
+        );
     }
 
     /// @notice Mints a new position, opening on pool

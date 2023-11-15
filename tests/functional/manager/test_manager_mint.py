@@ -183,7 +183,12 @@ def test_manager_mint__sets_position_ref(
     assert manager.positions(next_id) == (
         pool_initialized_with_liquidity.address,
         position_id,
-        *position,
+        sender.address,  # manager.ownerOf(token_id)
+        zero_for_one,
+        position.size,
+        position.debt0 if zero_for_one else position.debt1,
+        position.margin,
+        position.liquidated,
     )
 
 

@@ -93,6 +93,7 @@ def test_manager_grab__liquidates_position(
     mock_univ3_pool,
     position_lib,
     mint_position,
+    sender,
     adjust_oracle,
 ):
     token_id = mint_position(zero_for_one)
@@ -129,7 +130,18 @@ def test_manager_grab__liquidates_position(
         FUNDING_PERIOD,
     )
     position = position_lib.liquidate(position)
+
     assert pool_initialized_with_liquidity.positions(key) == position
+    assert manager.positions(token_id) == (
+        pool_initialized_with_liquidity.address,
+        position_id,
+        sender.address,  # manager.ownerOf(token_id)
+        zero_for_one,
+        position.size,
+        position.debt0 if zero_for_one else position.debt1,
+        position.margin,
+        position.liquidated,
+    )
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])

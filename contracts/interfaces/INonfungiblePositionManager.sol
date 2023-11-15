@@ -15,18 +15,12 @@ interface INonfungiblePositionManager is IERC721 {
         returns (
             address pool,
             uint96 positionId,
-            uint128 size,
-            uint128 debt0,
-            uint128 debt1,
-            uint128 insurance0,
-            uint128 insurance1,
+            address owner,
             bool zeroForOne,
-            bool liquidated,
-            int56 tick,
-            uint32 blockTimestamp,
-            int56 tickCumulativeDelta,
+            uint128 size,
+            uint128 debt,
             uint128 margin,
-            uint128 liquidityLocked
+            bool liquidated
         );
 
     struct MintParams {
