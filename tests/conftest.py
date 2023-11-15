@@ -213,7 +213,7 @@ def manager(project, accounts, factory, WETH9):
 
 @pytest.fixture(scope="session")
 def router(project, accounts, factory, WETH9):
-    return project.SwapRouter.deploy(factory.address, WETH9.address, sender=accounts[0])
+    return project.Router.deploy(factory.address, WETH9.address, sender=accounts[0])
 
 
 @pytest.fixture(scope="session")

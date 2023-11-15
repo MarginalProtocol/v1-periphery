@@ -9,7 +9,7 @@ import {SelfPermit} from "@uniswap/v3-periphery/contracts/base/SelfPermit.sol";
 
 import {PeripheryImmutableState} from "./base/PeripheryImmutableState.sol";
 import {PoolInitializer} from "./base/PoolInitializer.sol";
-import {ISwapRouter} from "./interfaces/ISwapRouter.sol";
+import {IRouter} from "./interfaces/IRouter.sol";
 import {IV1Migrator} from "./interfaces/IV1Migrator.sol";
 
 /// @title Marginal V1 Migrator
@@ -20,7 +20,7 @@ contract V1Migrator is
     Multicall,
     SelfPermit
 {
-    address public immutable marginalV1SwapRouter;
+    address public immutable marginalV1Router;
     address public immutable uniswapV3NonfungiblePositionManager;
 
     modifier onlyApprovedOrOwner(uint256 tokenId) {
@@ -33,10 +33,10 @@ contract V1Migrator is
     constructor(
         address _factory,
         address _WETH9,
-        address _marginalV1SwapRouter,
+        address _marginalV1Router,
         address _uniswapV3NonfungiblePositionManager
     ) PeripheryImmutableState(_factory, _WETH9) {
-        marginalV1SwapRouter = _marginalV1SwapRouter;
+        marginalV1Router = _marginalV1Router;
         uniswapV3NonfungiblePositionManager = _uniswapV3NonfungiblePositionManager;
     }
 
@@ -63,7 +63,7 @@ contract V1Migrator is
         IUniswapV3NonfungiblePositionManager manager = IUniswapV3NonfungiblePositionManager(
                 uniswapV3NonfungiblePositionManager
             ); // uniswap v3
-        ISwapRouter router = ISwapRouter(marginalV1SwapRouter); // marginal v1
+        IRouter router = IRouter(marginalV1Router); // marginal v1
 
         manager.decreaseLiquidity(
             IUniswapV3NonfungiblePositionManager.DecreaseLiquidityParams({
@@ -89,7 +89,7 @@ contract V1Migrator is
 
         (, uint256 amount0Migrated, uint256 amount1Migrated) = router
             .addLiquidity(
-                ISwapRouter.AddLiquidityParams({
+                IRouter.AddLiquidityParams({
                     token0: params.token0,
                     token1: params.token1,
                     maintenance: params.maintenance,

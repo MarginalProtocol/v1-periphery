@@ -5,7 +5,7 @@ pragma abicoder v2;
 import "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1MintCallback.sol";
 import "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1SwapCallback.sol";
 
-interface ISwapRouter is IMarginalV1MintCallback, IMarginalV1SwapCallback {
+interface IRouter is IMarginalV1MintCallback, IMarginalV1SwapCallback {
     event IncreaseLiquidity(
         uint256 shares,
         uint128 liquidityDelta,

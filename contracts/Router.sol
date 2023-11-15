@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * @title SwapRouter
+ * @title Router
  * @author Uniswap Labs
  *
- * @dev Fork of Uniswap V3 periphery SwapRouter for swaps on Marginal V1 pools.
+ * @dev Fork of Uniswap V3 periphery SwapRouter for swaps and liquidity provision on Marginal V1 pools.
  */
 pragma solidity =0.8.15;
 pragma abicoder v2;
@@ -17,7 +17,7 @@ import {SelfPermit} from "@uniswap/v3-periphery/contracts/base/SelfPermit.sol";
 
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
 
-import {ISwapRouter} from "./interfaces/ISwapRouter.sol";
+import {IRouter} from "./interfaces/IRouter.sol";
 import {LiquidityManagement} from "./base/LiquidityManagement.sol";
 import {PoolInitializer} from "./base/PoolInitializer.sol";
 import {PeripheryImmutableState} from "./base/PeripheryImmutableState.sol";
@@ -28,8 +28,8 @@ import {LiquidityAmounts} from "./libraries/LiquidityAmounts.sol";
 import {Path} from "./libraries/Path.sol";
 import {PoolAddress} from "./libraries/PoolAddress.sol";
 
-contract SwapRouter is
-    ISwapRouter,
+contract Router is
+    IRouter,
     PeripheryImmutableState,
     PoolInitializer,
     LiquidityManagement,
@@ -154,7 +154,7 @@ contract SwapRouter is
         return uint256(-(zeroForOne ? amount1 : amount0));
     }
 
-    /// @inheritdoc ISwapRouter
+    /// @inheritdoc IRouter
     function exactInputSingle(
         ExactInputSingleParams calldata params
     )
@@ -181,7 +181,7 @@ contract SwapRouter is
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
 
-    /// @inheritdoc ISwapRouter
+    /// @inheritdoc IRouter
     function exactInput(
         ExactInputParams memory params
     )
@@ -267,7 +267,7 @@ contract SwapRouter is
         if (sqrtPriceLimitX96 == 0) require(amountOutReceived == amountOut);
     }
 
-    /// @inheritdoc ISwapRouter
+    /// @inheritdoc IRouter
     function exactOutputSingle(
         ExactOutputSingleParams calldata params
     )
@@ -298,7 +298,7 @@ contract SwapRouter is
         amountInCached = DEFAULT_AMOUNT_IN_CACHED;
     }
 
-    /// @inheritdoc ISwapRouter
+    /// @inheritdoc IRouter
     function exactOutput(
         ExactOutputParams calldata params
     )
@@ -322,7 +322,7 @@ contract SwapRouter is
         amountInCached = DEFAULT_AMOUNT_IN_CACHED;
     }
 
-    /// @inheritdoc ISwapRouter
+    /// @inheritdoc IRouter
     function addLiquidity(
         AddLiquidityParams calldata params
     )
@@ -358,7 +358,7 @@ contract SwapRouter is
         emit IncreaseLiquidity(shares, liquidityDelta, amount0, amount1);
     }
 
-    /// @inheritdoc ISwapRouter
+    /// @inheritdoc IRouter
     function removeLiquidity(
         RemoveLiquidityParams calldata params
     )
