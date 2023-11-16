@@ -1,7 +1,10 @@
 import pytest
 
 from ape import reverts
-from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96
+from utils.utils import (
+    calc_amounts_from_liquidity_sqrt_price_x96,
+    calc_tick_from_sqrt_price_x96,
+)
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
@@ -74,10 +77,12 @@ def test_router_exact_input_single__updates_state(
     ) = liquidity_math_lib.liquiditySqrtPriceX96Next(
         state.liquidity, sqrt_price_x96_next, amount0, amount1
     )
+    tick_after = calc_tick_from_sqrt_price_x96(sqrt_price_x96_after)
 
     result = pool_initialized_with_liquidity.state()
     assert result.liquidity == liquidity_after
     assert result.sqrtPriceX96 == sqrt_price_x96_after
+    assert result.tick == tick_after
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
