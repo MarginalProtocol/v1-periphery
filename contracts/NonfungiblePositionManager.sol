@@ -65,7 +65,6 @@ contract NonfungiblePositionManager is
         returns (
             address pool,
             uint96 positionId,
-            address owner,
             bool zeroForOne,
             uint128 size,
             uint128 debt,
@@ -76,7 +75,6 @@ contract NonfungiblePositionManager is
         Position memory position = _positions[tokenId];
         pool = position.pool;
         positionId = position.id;
-        owner = ownerOf(tokenId);
         (zeroForOne, size, debt, margin, liquidated) = getPositionSynced(
             pool,
             address(this),

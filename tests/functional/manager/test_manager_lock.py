@@ -105,7 +105,6 @@ def test_manager_lock__adjusts_position(
     assert manager.positions(token_id) == (
         pool_initialized_with_liquidity.address,
         position_id,
-        sender.address,  # manager.ownerOf(token_id)
         zero_for_one,
         position.size,
         position.debt0 if zero_for_one else position.debt1,

@@ -15,7 +15,6 @@ interface INonfungiblePositionManager is IERC721 {
         returns (
             address pool,
             uint96 positionId,
-            address owner,
             bool zeroForOne,
             uint128 size,
             uint128 debt,
