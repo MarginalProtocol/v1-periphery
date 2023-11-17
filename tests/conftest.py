@@ -187,7 +187,17 @@ def pool(mock_univ3_pool, create_pool):
     )
 
 
-# TODO: maintenance parameterization
+@pytest.fixture(scope="session")
+def pool_two(mock_univ3_pool, create_pool):
+    maintenance = 500000
+    return create_pool(
+        mock_univ3_pool.token0(),
+        mock_univ3_pool.token1(),
+        maintenance,
+        mock_univ3_pool.fee(),
+    )
+
+
 @pytest.fixture(scope="session")
 def rando_pool(rando_univ3_pool, create_pool):
     maintenance = 250000
