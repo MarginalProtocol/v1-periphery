@@ -161,3 +161,192 @@ def test_router_exact_input__updates_states(
     assert result_two.liquidity == liquidity_after_two
     assert result_two.sqrtPriceX96 == sqrt_price_x96_after_two
     assert result_two.tick == tick_after_two
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_router_exact_input__transfers_funds(
+    pool_initialized_with_liquidity,
+    pool_two_initialized_with_liquidity,
+    router,
+    sender,
+    alice,
+    chain,
+    zero_for_one,
+    token0,
+    token1,
+    multi_path,
+    sqrt_price_math_lib,
+    liquidity_math_lib,
+    swap_math_lib,
+):
+    state = pool_initialized_with_liquidity.state()
+    state_two = pool_two_initialized_with_liquidity.state()
+
+    fee = pool_initialized_with_liquidity.fee()
+    fee_two = pool_two_initialized_with_liquidity.fee()
+
+    deadline = chain.pending_timestamp + 3600
+    amount_out_min = 0
+    path = multi_path(zero_for_one)
+
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    amount_in = 1 * reserve0 // 100 if zero_for_one else 1 * reserve1 // 100
+
+    # cache balances before swap
+    balance0_sender = token0.balanceOf(sender.address)
+    balance1_sender = token1.balanceOf(sender.address)
+
+    balance0_pool = token0.balanceOf(pool_initialized_with_liquidity.address)
+    balance1_pool = token1.balanceOf(pool_initialized_with_liquidity.address)
+
+    balance0_pool_two = token0.balanceOf(pool_two_initialized_with_liquidity.address)
+    balance1_pool_two = token1.balanceOf(pool_two_initialized_with_liquidity.address)
+
+    balance0_alice = token0.balanceOf(alice.address)
+    balance1_alice = token1.balanceOf(alice.address)
+
+    params = (
+        path,
+        alice.address,  # recipient
+        deadline,
+        amount_in,
+        amount_out_min,
+    )
+    router.exactInput(params, sender=sender)
+
+    # calculate amount out from pool 1 to be used as amount in to pool 2
+    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee)
+    sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextSwap(
+        state.liquidity,
+        state.sqrtPriceX96,
+        zero_for_one,  # token_in => token_out
+        amount_in_less_fee,
+    )  # price change before fees added
+
+    (amount0, amount1) = swap_math_lib.swapAmounts(
+        state.liquidity, state.sqrtPriceX96, sqrt_price_x96_next
+    )
+    amount_out = -amount1 if zero_for_one else -amount0
+
+    # check pool 1 balances
+    balance0_pool_after = (
+        balance0_pool + amount_in if zero_for_one else balance0_pool - amount_out
+    )
+    balance1_pool_after = (
+        balance1_pool - amount_out if zero_for_one else balance1_pool + amount_in
+    )
+    assert (
+        token0.balanceOf(pool_initialized_with_liquidity.address) == balance0_pool_after
+    )
+    assert (
+        token1.balanceOf(pool_initialized_with_liquidity.address) == balance1_pool_after
+    )
+
+    # calculate amount out from pool 2
+    amount_in_two = amount_out
+    amount_in_two_less_fee = amount_in_two - swap_math_lib.swapFees(
+        amount_in_two, fee_two
+    )
+    sqrt_price_x96_next_two = sqrt_price_math_lib.sqrtPriceX96NextSwap(
+        state_two.liquidity,
+        state_two.sqrtPriceX96,
+        (not zero_for_one),  # token_out => token_in
+        amount_in_two_less_fee,
+    )  # price change before fees added
+    (amount0_two, amount1_two) = swap_math_lib.swapAmounts(
+        state_two.liquidity, state_two.sqrtPriceX96, sqrt_price_x96_next_two
+    )
+    amount_out_two = -amount1_two if (not zero_for_one) else -amount0_two
+
+    # check pool 2 balances
+    balance0_pool_two_after = (
+        balance0_pool_two + amount_in_two
+        if (not zero_for_one)
+        else balance0_pool_two - amount_out_two
+    )
+    balance1_pool_two_after = (
+        balance1_pool_two - amount_out_two
+        if (not zero_for_one)
+        else balance1_pool_two + amount_in_two
+    )
+    assert (
+        token0.balanceOf(pool_two_initialized_with_liquidity.address)
+        == balance0_pool_two_after
+    )
+    assert (
+        token1.balanceOf(pool_two_initialized_with_liquidity.address)
+        == balance1_pool_two_after
+    )
+
+    # check sender balances after
+    balance0_sender_after = (
+        balance0_sender - amount_in if zero_for_one else balance0_sender
+    )
+    balance1_sender_after = (
+        balance1_sender if zero_for_one else balance1_sender - amount_in
+    )
+    assert token0.balanceOf(sender.address) == balance0_sender_after
+    assert token1.balanceOf(sender.address) == balance1_sender_after
+
+    # check alice balances after
+    balance0_alice_after = (
+        balance0_alice if (not zero_for_one) else balance0_alice + amount_out_two
+    )
+    balance1_alice_after = (
+        balance1_alice + amount_out_two if (not zero_for_one) else balance1_alice
+    )
+    assert token0.balanceOf(alice.address) == balance0_alice_after
+    assert token1.balanceOf(alice.address) == balance1_alice_after
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_router_exact_input__returns_amount_out(
+    pool_initialized_with_liquidity,
+    pool_two_initialized_with_liquidity,
+    router,
+    sender,
+    alice,
+    chain,
+    zero_for_one,
+    multi_path,
+    sqrt_price_math_lib,
+    liquidity_math_lib,
+    swap_math_lib,
+):
+    pass
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_router_exact_input__reverts_when_past_deadline(
+    pool_initialized_with_liquidity,
+    pool_two_initialized_with_liquidity,
+    router,
+    sender,
+    alice,
+    chain,
+    zero_for_one,
+    multi_path,
+    sqrt_price_math_lib,
+    liquidity_math_lib,
+    swap_math_lib,
+):
+    pass
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_router_exact_input__reverts_when_amount_out_less_than_min(
+    pool_initialized_with_liquidity,
+    pool_two_initialized_with_liquidity,
+    router,
+    sender,
+    alice,
+    chain,
+    zero_for_one,
+    multi_path,
+    sqrt_price_math_lib,
+    liquidity_math_lib,
+    swap_math_lib,
+):
+    pass
