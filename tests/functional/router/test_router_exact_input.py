@@ -315,7 +315,60 @@ def test_router_exact_input__returns_amount_out(
     liquidity_math_lib,
     swap_math_lib,
 ):
-    pass
+    state = pool_initialized_with_liquidity.state()
+    state_two = pool_two_initialized_with_liquidity.state()
+
+    fee = pool_initialized_with_liquidity.fee()
+    fee_two = pool_two_initialized_with_liquidity.fee()
+
+    deadline = chain.pending_timestamp + 3600
+    amount_out_min = 0
+    path = multi_path(zero_for_one)
+
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    amount_in = 1 * reserve0 // 100 if zero_for_one else 1 * reserve1 // 100
+
+    params = (
+        path,
+        alice.address,  # recipient
+        deadline,
+        amount_in,
+        amount_out_min,
+    )
+    tx = router.exactInput(params, sender=sender)
+
+    # calculate amount out from pool 1 to be used as amount in to pool 2
+    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee)
+    sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextSwap(
+        state.liquidity,
+        state.sqrtPriceX96,
+        zero_for_one,  # token_in => token_out
+        amount_in_less_fee,
+    )  # price change before fees added
+
+    (amount0, amount1) = swap_math_lib.swapAmounts(
+        state.liquidity, state.sqrtPriceX96, sqrt_price_x96_next
+    )
+    amount_out = -amount1 if zero_for_one else -amount0
+
+    # calculate amount out from pool 2
+    amount_in_two = amount_out
+    amount_in_two_less_fee = amount_in_two - swap_math_lib.swapFees(
+        amount_in_two, fee_two
+    )
+    sqrt_price_x96_next_two = sqrt_price_math_lib.sqrtPriceX96NextSwap(
+        state_two.liquidity,
+        state_two.sqrtPriceX96,
+        (not zero_for_one),  # token_out => token_in
+        amount_in_two_less_fee,
+    )  # price change before fees added
+    (amount0_two, amount1_two) = swap_math_lib.swapAmounts(
+        state_two.liquidity, state_two.sqrtPriceX96, sqrt_price_x96_next_two
+    )
+    amount_out_two = -amount1_two if (not zero_for_one) else -amount0_two
+    assert tx.return_value == amount_out_two
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
