@@ -37,6 +37,8 @@ def pool_two_initialized_with_liquidity(
 def multi_path(mock_univ3_pool, token0, token1):
     # e.g. token_in => pool => token_out => pool_two => token_in
     def _multi_path(zero_for_one: bool) -> HexBytes:
+        # zero_for_one == True: 0 => 1 => 0
+        # zero_for_one == False: 1 => 0 => 1
         token_in = token0.address if zero_for_one else token1.address
         token_out = token1.address if zero_for_one else token0.address
         return encode_packed(
@@ -47,7 +49,7 @@ def multi_path(mock_univ3_pool, token0, token1):
                 "address",  # token out 0 / token in 1
                 "uint24",  # maintenance 1
                 "address",  # oracle 1
-                "address",  # token out 1
+                "address",  # token in 1
             ],
             [
                 token_in,
