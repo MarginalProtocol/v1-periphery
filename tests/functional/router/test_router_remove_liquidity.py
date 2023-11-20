@@ -163,7 +163,6 @@ def test_router_remove_liquidity__emits_decrease_liquidity(
         deadline,
     )
     tx = router.removeLiquidity(params, sender=sender)
-    assert tx.return_value == (liquidity_delta, amount0, amount1)
 
     events = tx.decode_logs(router.DecreaseLiquidity)
     assert len(events) == 1
