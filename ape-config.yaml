@@ -2,9 +2,15 @@ name: v1-periphery
 
 plugins:
   - name: alchemy
+    version: 0.6.2
   - name: etherscan
+    version: 0.6.7
   - name: solidity
+    version: 0.6.9
   - name: foundry
+    version: 0.6.12
+  - name: arbitrum
+    version: 0.6.1
 
 default_ecosystem: ethereum
 
@@ -31,10 +37,8 @@ dependencies:
     ref: 0.8
   - name: marginal-v1-core
     local: ../v1-core
-    version: 1.0.0-beta.13
 
 solidity:
-  runs: 200
   via_ir: true
   import_remapping:
     - "@openzeppelin/contracts=openzeppelin/v4.8.3"
