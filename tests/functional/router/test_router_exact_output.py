@@ -197,7 +197,140 @@ def test_router_exact_output__transfers_funds(
     liquidity_math_lib,
     swap_math_lib,
 ):
-    pass
+    state = pool_initialized_with_liquidity.state()
+    state_two = pool_two_initialized_with_liquidity.state()
+
+    fee = pool_initialized_with_liquidity.fee()
+    fee_two = pool_two_initialized_with_liquidity.fee()
+
+    deadline = chain.pending_timestamp + 3600
+    amount_in_max = 2**256 - 1
+
+    path = multi_path(zero_for_one)
+
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    amount_out = 1 * reserve0 // 100 if zero_for_one else 1 * reserve1 // 100
+
+    # cache balances before swap
+    balance0_sender = token0.balanceOf(sender.address)
+    balance1_sender = token1.balanceOf(sender.address)
+
+    balance0_pool = token0.balanceOf(pool_initialized_with_liquidity.address)
+    balance1_pool = token1.balanceOf(pool_initialized_with_liquidity.address)
+
+    balance0_pool_two = token0.balanceOf(pool_two_initialized_with_liquidity.address)
+    balance1_pool_two = token1.balanceOf(pool_two_initialized_with_liquidity.address)
+
+    balance0_alice = token0.balanceOf(alice.address)
+    balance1_alice = token1.balanceOf(alice.address)
+
+    params = (
+        path,
+        alice.address,  # recipient
+        deadline,
+        amount_out,
+        amount_in_max,
+    )
+    router.exactOutput(params, sender=sender)
+
+    # calculate amount in from pool 1 to be used as amount out to pool 2
+    sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextSwap(
+        state.liquidity, state.sqrtPriceX96, (not zero_for_one), -amount_out
+    )  # price change before fees
+    (amount0, amount1) = swap_math_lib.swapAmounts(
+        state.liquidity,
+        state.sqrtPriceX96,
+        sqrt_price_x96_next,
+    )
+
+    # factor in fees
+    if not zero_for_one:
+        fees0 = swap_math_lib.swapFees(amount0, fee)
+        amount0 += fees0
+    else:
+        fees1 = swap_math_lib.swapFees(amount1, fee)
+        amount1 += fees1
+
+    # calculate amount in from pool 2
+    amount_out_two = (
+        amount1 if zero_for_one else amount0
+    )  # > 0 since was amount_in to pool 1
+    amount_in = amount_out_two
+
+    sqrt_price_x96_next_two = sqrt_price_math_lib.sqrtPriceX96NextSwap(
+        state_two.liquidity, state_two.sqrtPriceX96, zero_for_one, -amount_out_two
+    )  # price change before fees
+    (amount0_two, amount1_two) = swap_math_lib.swapAmounts(
+        state_two.liquidity,
+        state_two.sqrtPriceX96,
+        sqrt_price_x96_next_two,
+    )
+
+    # factor in fees
+    if zero_for_one:
+        fees0_two = swap_math_lib.swapFees(amount0_two, fee_two)
+        amount0_two += fees0_two
+    else:
+        fees1_two = swap_math_lib.swapFees(amount1_two, fee_two)
+        amount1_two += fees1_two
+
+    amount_in_two = amount0_two if zero_for_one else amount1_two
+
+    balance0_sender_after = (
+        balance0_sender - amount_in_two if zero_for_one else balance0_sender
+    )
+    balance1_sender_after = (
+        balance1_sender if zero_for_one else balance1_sender - amount_in_two
+    )
+
+    assert token0.balanceOf(sender.address) == balance0_sender_after
+    assert token1.balanceOf(sender.address) == balance1_sender_after
+
+    balance0_alice_after = (
+        balance0_alice + amount_out if zero_for_one else balance0_alice
+    )
+    balance1_alice_after = (
+        balance1_alice if zero_for_one else balance1_alice + amount_out
+    )
+
+    assert token0.balanceOf(alice.address) == balance0_alice_after
+    assert token1.balanceOf(alice.address) == balance1_alice_after
+
+    balance0_pool_after = (
+        balance0_pool + amount_in if (not zero_for_one) else balance0_pool - amount_out
+    )
+    balance1_pool_after = (
+        balance1_pool - amount_out if (not zero_for_one) else balance1_pool + amount_in
+    )
+
+    assert (
+        token0.balanceOf(pool_initialized_with_liquidity.address) == balance0_pool_after
+    )
+    assert (
+        token1.balanceOf(pool_initialized_with_liquidity.address) == balance1_pool_after
+    )
+
+    balance0_pool_two_after = (
+        balance0_pool_two - amount_out_two
+        if (not zero_for_one)
+        else balance0_pool_two + amount_in_two
+    )
+    balance1_pool_two_after = (
+        balance1_pool_two + amount_in_two
+        if (not zero_for_one)
+        else balance1_pool_two - amount_out_two
+    )
+
+    assert (
+        token0.balanceOf(pool_two_initialized_with_liquidity.address)
+        == balance0_pool_two_after
+    )
+    assert (
+        token1.balanceOf(pool_two_initialized_with_liquidity.address)
+        == balance1_pool_two_after
+    )
 
 
 @pytest.mark.skip
