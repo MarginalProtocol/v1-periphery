@@ -55,7 +55,6 @@ abstract contract PoolInitializer is IPoolInitializer, PeripheryImmutableState {
         }
     }
 
-    // TODO: test
     /// @inheritdoc IPoolInitializer
     function initializeOracleIfNecessary(
         address token0,
@@ -85,7 +84,7 @@ abstract contract PoolInitializer is IPoolInitializer, PeripheryImmutableState {
             .observationCardinalityMinimum();
         require(
             observationCardinalityNextExisting < observationCardinalityNext &&
-                observationCardinalityMinimum < observationCardinalityNext
+                observationCardinalityMinimum <= observationCardinalityNext
         );
 
         if (

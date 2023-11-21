@@ -92,4 +92,10 @@ contract MockUniswapV3Pool {
                 .secondsPerLiquidityCumulativeX128;
         }
     }
+
+    function increaseObservationCardinalityNext(
+        uint16 observationCardinalityNext
+    ) external {
+        slot0.observationCardinalityNext = observationCardinalityNext;
+    }
 }
