@@ -15,7 +15,6 @@ import {IPoolInitializer} from "../interfaces/IPoolInitializer.sol";
 abstract contract PoolInitializer is IPoolInitializer, PeripheryImmutableState {
     error InvalidOracle();
 
-    // TODO: test
     /// @inheritdoc IPoolInitializer
     function createAndInitializePoolIfNecessary(
         address token0,
