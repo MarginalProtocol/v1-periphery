@@ -1,20 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity =0.8.15;
 
+import {PeripheryValidation} from "@uniswap/v3-periphery/contracts/base/PeripheryValidation.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
 import {LiquidityMath} from "@marginal/v1-core/contracts/libraries/LiquidityMath.sol";
 import {Position} from "@marginal/v1-core/contracts/libraries/Position.sol";
+import {SwapMath} from "@marginal/v1-core/contracts/libraries/SwapMath.sol";
 import {SqrtPriceMath} from "@marginal/v1-core/contracts/libraries/SqrtPriceMath.sol";
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
 
 import {PeripheryImmutableState} from "../base/PeripheryImmutableState.sol";
 import {PoolAddress} from "../libraries/PoolAddress.sol";
 import {PositionAmounts} from "../libraries/PositionAmounts.sol";
+
 import {INonfungiblePositionManager} from "../interfaces/INonfungiblePositionManager.sol";
+import {IRouter} from "../interfaces/IRouter.sol";
 import {IQuoter} from "../interfaces/IQuoter.sol";
 
-contract Quoter is IQuoter, PeripheryImmutableState {
+contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
     uint24 private constant fee = 1000;
     uint24 private constant reward = 50000;
 
@@ -36,6 +40,7 @@ contract Quoter is IQuoter, PeripheryImmutableState {
     )
         external
         view
+        checkDeadline(params.deadline)
         returns (
             uint256 size,
             uint256 debt,
@@ -44,8 +49,6 @@ contract Quoter is IQuoter, PeripheryImmutableState {
             uint160 sqrtPriceX96After
         )
     {
-        if (block.timestamp <= params.deadline) revert("Transaction too old");
-
         IMarginalV1Pool pool = getPool(
             PoolAddress.PoolKey({
                 token0: params.token0,
@@ -155,4 +158,141 @@ contract Quoter is IQuoter, PeripheryImmutableState {
                 !params.zeroForOne ? int256(0) : int256(fees)
             );
     }
+
+    /// @inheritdoc IQuoter
+    function quoteExactInputSingle(
+        IRouter.ExactInputSingleParams calldata params
+    )
+        public
+        view
+        checkDeadline(params.deadline)
+        returns (
+            uint256 amountOut,
+            uint128 liquidityAfter,
+            uint160 sqrtPriceX96After
+        )
+    {
+        bool zeroForOne = params.tokenIn < params.tokenOut;
+        IMarginalV1Pool pool = getPool(
+            PoolAddress.PoolKey({
+                token0: zeroForOne ? params.tokenIn : params.tokenOut,
+                token1: zeroForOne ? params.tokenOut : params.tokenIn,
+                maintenance: params.maintenance,
+                oracle: params.oracle
+            })
+        );
+
+        (
+            uint128 liquidity,
+            uint160 sqrtPriceX96,
+            ,
+            ,
+            ,
+            ,
+            uint8 feeProtocol,
+            bool initialized
+        ) = pool.state();
+        if (!initialized) revert("Not initialized");
+
+        uint160 sqrtPriceLimitX96 = params.sqrtPriceLimitX96 == 0
+            ? (
+                zeroForOne
+                    ? TickMath.MIN_SQRT_RATIO + 1
+                    : TickMath.MAX_SQRT_RATIO - 1
+            )
+            : params.sqrtPriceLimitX96;
+
+        if (
+            params.amountIn == 0 || params.amountIn >= uint256(type(int256).max)
+        ) revert("Invalid amountIn");
+        int256 amountSpecified = int256(params.amountIn);
+
+        if (
+            zeroForOne
+                ? !(sqrtPriceLimitX96 < sqrtPriceX96 &&
+                    sqrtPriceLimitX96 > SqrtPriceMath.MIN_SQRT_RATIO)
+                : !(sqrtPriceLimitX96 > sqrtPriceX96 &&
+                    sqrtPriceLimitX96 < SqrtPriceMath.MAX_SQRT_RATIO)
+        ) revert("Invalid sqrtPriceLimitX96");
+
+        int256 amountSpecifiedLessFee = amountSpecified -
+            int256(SwapMath.swapFees(uint256(amountSpecified), fee));
+        uint160 sqrtPriceX96Next = SqrtPriceMath.sqrtPriceX96NextSwap(
+            liquidity,
+            sqrtPriceX96,
+            zeroForOne,
+            amountSpecifiedLessFee
+        );
+        if (
+            zeroForOne
+                ? sqrtPriceX96Next < sqrtPriceLimitX96
+                : sqrtPriceX96Next > sqrtPriceLimitX96
+        ) revert("sqrtPriceX96Next exceeds limit");
+
+        // amounts without fees
+        (int256 amount0, int256 amount1) = SwapMath.swapAmounts(
+            liquidity,
+            sqrtPriceX96,
+            sqrtPriceX96Next
+        );
+        amountOut = uint256(-(zeroForOne ? amount1 : amount0));
+        if (amountOut < params.amountOutMinimum) revert("Too little received");
+
+        // account for protocol fees if turned on
+        uint256 amountInLessFee = uint256(zeroForOne ? amount0 : amount1);
+        uint256 fees = params.amountIn - amountInLessFee;
+        uint256 amountIn = amountInLessFee + fees;
+        if (feeProtocol > 0) amountIn -= uint256(fees / feeProtocol);
+
+        // calculate liquidity, sqrtP after
+        (liquidityAfter, sqrtPriceX96After) = LiquidityMath
+            .liquiditySqrtPriceX96Next(
+                liquidity,
+                sqrtPriceX96,
+                zeroForOne ? int256(amountIn) : -int256(amountOut),
+                zeroForOne ? -int256(amountOut) : int256(amountIn)
+            );
+    }
+
+    /// @inheritdoc IQuoter
+    function quoteExactInput(
+        IRouter.ExactInputParams calldata params
+    )
+        external
+        view
+        checkDeadline(params.deadline)
+        returns (
+            uint256 amountOut,
+            uint128[] memory liquiditiesAfter,
+            uint160[] memory sqrtPricesX96After
+        )
+    {}
+
+    /// @inheritdoc IQuoter
+    function quoteExactOutputSingle(
+        IRouter.ExactOutputSingleParams calldata params
+    )
+        public
+        view
+        checkDeadline(params.deadline)
+        returns (
+            uint256 amountIn,
+            uint128 liquidityAfter,
+            uint160 sqrtPriceX96After
+        )
+    {}
+
+    /// @inheritdoc IQuoter
+    function quoteExactOutput(
+        IRouter.ExactOutputParams calldata params
+    )
+        external
+        view
+        checkDeadline(params.deadline)
+        returns (
+            uint256 amountIn,
+            uint128[] memory liquiditiesAfter,
+            uint160[] memory sqrtPricesX96After
+        )
+    {}
 }
