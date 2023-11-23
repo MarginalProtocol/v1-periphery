@@ -11,6 +11,7 @@ import {SqrtPriceMath} from "@marginal/v1-core/contracts/libraries/SqrtPriceMath
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
 
 import {PeripheryImmutableState} from "../base/PeripheryImmutableState.sol";
+import {Path} from "../libraries/Path.sol";
 import {PoolAddress} from "../libraries/PoolAddress.sol";
 import {PositionAmounts} from "../libraries/PositionAmounts.sol";
 
@@ -19,6 +20,8 @@ import {IRouter} from "../interfaces/IRouter.sol";
 import {IQuoter} from "../interfaces/IQuoter.sol";
 
 contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
+    using Path for bytes;
+
     uint24 private constant fee = 1000;
     uint24 private constant reward = 50000;
 
@@ -161,7 +164,7 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
 
     /// @inheritdoc IQuoter
     function quoteExactInputSingle(
-        IRouter.ExactInputSingleParams calldata params
+        IRouter.ExactInputSingleParams memory params
     )
         public
         view
@@ -256,17 +259,59 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
 
     /// @inheritdoc IQuoter
     function quoteExactInput(
-        IRouter.ExactInputParams calldata params
+        IRouter.ExactInputParams memory params
     )
         external
         view
-        checkDeadline(params.deadline)
         returns (
             uint256 amountOut,
             uint128[] memory liquiditiesAfter,
             uint160[] memory sqrtPricesX96After
         )
-    {}
+    {
+        uint256 numPools = params.path.numPools();
+        liquiditiesAfter = new uint128[](numPools);
+        sqrtPricesX96After = new uint160[](numPools);
+
+        uint256 i;
+        while (true) {
+            bool hasMultiplePools = params.path.hasMultiplePools();
+            (
+                address tokenIn,
+                address tokenOut,
+                uint24 maintenance,
+                address oracle
+            ) = params.path.decodeFirstPool();
+            (
+                params.amountIn,
+                liquiditiesAfter[i],
+                sqrtPricesX96After[i]
+            ) = quoteExactInputSingle(
+                IRouter.ExactInputSingleParams({
+                    tokenIn: tokenIn,
+                    tokenOut: tokenOut,
+                    maintenance: maintenance,
+                    oracle: oracle,
+                    recipient: params.recipient,
+                    deadline: params.deadline,
+                    amountIn: params.amountIn,
+                    amountOutMinimum: 0,
+                    sqrtPriceLimitX96: 0
+                })
+            );
+            i++; // for lists
+
+            // exit out if reached end of path
+            if (hasMultiplePools) {
+                params.path = params.path.skipToken();
+            } else {
+                amountOut = params.amountIn;
+                break;
+            }
+        }
+
+        if (amountOut < params.amountOutMinimum) revert("Too little received");
+    }
 
     /// @inheritdoc IQuoter
     function quoteExactOutputSingle(
@@ -288,7 +333,6 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
     )
         external
         view
-        checkDeadline(params.deadline)
         returns (
             uint256 amountIn,
             uint128[] memory liquiditiesAfter,
