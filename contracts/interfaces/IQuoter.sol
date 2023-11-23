@@ -6,7 +6,7 @@ import {INonfungiblePositionManager} from "./INonfungiblePositionManager.sol";
 interface IQuoter {
     /// @notice Quotes the position result of NonfungiblePositionManager::mint
     /// @param params Param inputs to NonfungiblePositionManager::mint
-    /// @dev Returns zeros if mint would revert
+    /// @dev Reverts if mint would revert
     /// @return size Position size in units of amount1 if zeroForOne == true else units of amount0
     /// @return debt Position debt in units of amount0 if zeroForOne == true else units of amount1
     /// @return amountIn Amount of margin token in required to open position in, includes fees and liquidation rewards set aside in pool

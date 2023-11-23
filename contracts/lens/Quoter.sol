@@ -44,6 +44,8 @@ contract Quoter is IQuoter, PeripheryImmutableState {
             uint160 sqrtPriceX96After
         )
     {
+        if (block.timestamp <= params.deadline) revert("Transaction too old");
+
         IMarginalV1Pool pool = getPool(
             PoolAddress.PoolKey({
                 token0: params.token0,
@@ -63,7 +65,7 @@ contract Quoter is IQuoter, PeripheryImmutableState {
             uint8 feeProtocol,
             bool initialized
         ) = pool.state();
-        if (!initialized) return (0, 0, 0, 0, 0);
+        if (!initialized) revert("Not initialized");
 
         uint128 liquidityDelta = PositionAmounts.getLiquidityForSize(
             liquidity,
@@ -73,7 +75,7 @@ contract Quoter is IQuoter, PeripheryImmutableState {
             params.sizeDesired
         );
         if (liquidityDelta == 0 || liquidityDelta >= liquidity)
-            return (0, 0, 0, 0, 0);
+            revert("Invalid liquidityDelta");
 
         uint160 sqrtPriceLimitX96 = params.sqrtPriceLimitX96 == 0
             ? (
@@ -88,7 +90,7 @@ contract Quoter is IQuoter, PeripheryImmutableState {
                     sqrtPriceLimitX96 > SqrtPriceMath.MIN_SQRT_RATIO)
                 : !(sqrtPriceLimitX96 > sqrtPriceX96 &&
                     sqrtPriceLimitX96 < SqrtPriceMath.MAX_SQRT_RATIO)
-        ) return (0, 0, 0, 0, 0);
+        ) revert("Invalid sqrtPriceLimitX96");
 
         uint128 debtMaximum = params.debtMaximum == 0
             ? type(uint128).max
@@ -105,7 +107,7 @@ contract Quoter is IQuoter, PeripheryImmutableState {
             params.zeroForOne
                 ? sqrtPriceX96Next < sqrtPriceLimitX96
                 : sqrtPriceX96Next > sqrtPriceLimitX96
-        ) return (0, 0, 0, 0, 0);
+        ) revert("sqrtPriceX96Next exceeds limit");
 
         // @dev ignore tick cumulatives and timestamps on position assemble
         Position.Info memory position = Position.assemble(
@@ -122,18 +124,21 @@ contract Quoter is IQuoter, PeripheryImmutableState {
         if (
             position.size == 0 ||
             (params.zeroForOne ? position.debt0 == 0 : position.debt1 == 0)
-        ) return (0, 0, 0, 0, 0);
+        ) revert("Invalid position");
 
         uint128 marginMinimum = Position.marginMinimum(
             position,
             params.maintenance
         );
         if (marginMinimum == 0 || params.margin < marginMinimum)
-            return (0, 0, 0, 0, 0);
+            revert("Margin less than min");
         position.margin = params.margin;
 
         size = position.size;
+        if (size < params.sizeMinimum) revert("Size less than min");
+
         debt = params.zeroForOne ? position.debt0 : position.debt1;
+        if (debt > params.debtMaximum) revert("Debt greater than max");
 
         uint256 fees = Position.fees(position.size, fee);
         uint256 rewards = Position.liquidationRewards(position.size, reward);
