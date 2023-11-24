@@ -325,7 +325,90 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
             uint128 liquidityAfter,
             uint160 sqrtPriceX96After
         )
-    {}
+    {
+        bool zeroForOne = params.tokenIn < params.tokenOut;
+        IMarginalV1Pool pool = getPool(
+            PoolAddress.PoolKey({
+                token0: zeroForOne ? params.tokenIn : params.tokenOut,
+                token1: zeroForOne ? params.tokenOut : params.tokenIn,
+                maintenance: params.maintenance,
+                oracle: params.oracle
+            })
+        );
+
+        (
+            uint128 liquidity,
+            uint160 sqrtPriceX96,
+            ,
+            ,
+            ,
+            ,
+            uint8 feeProtocol,
+            bool initialized
+        ) = pool.state();
+        if (!initialized) revert("Not initialized");
+
+        uint160 sqrtPriceLimitX96 = params.sqrtPriceLimitX96 == 0
+            ? (
+                zeroForOne
+                    ? TickMath.MIN_SQRT_RATIO + 1
+                    : TickMath.MAX_SQRT_RATIO - 1
+            )
+            : params.sqrtPriceLimitX96;
+
+        if (
+            params.amountOut == 0 ||
+            params.amountOut >= uint256(type(int256).max)
+        ) revert("Invalid amountOut");
+        int256 amountSpecified = -int256(params.amountOut);
+
+        if (
+            zeroForOne
+                ? !(sqrtPriceLimitX96 < sqrtPriceX96 &&
+                    sqrtPriceLimitX96 > SqrtPriceMath.MIN_SQRT_RATIO)
+                : !(sqrtPriceLimitX96 > sqrtPriceX96 &&
+                    sqrtPriceLimitX96 < SqrtPriceMath.MAX_SQRT_RATIO)
+        ) revert("Invalid sqrtPriceLimitX96");
+
+        uint160 sqrtPriceX96Next = SqrtPriceMath.sqrtPriceX96NextSwap(
+            liquidity,
+            sqrtPriceX96,
+            zeroForOne,
+            amountSpecified
+        );
+        if (
+            zeroForOne
+                ? sqrtPriceX96Next < sqrtPriceLimitX96
+                : sqrtPriceX96Next > sqrtPriceLimitX96
+        ) revert("sqrtPriceX96Next exceeds limit");
+
+        // amounts without fees
+        (int256 amount0, int256 amount1) = SwapMath.swapAmounts(
+            liquidity,
+            sqrtPriceX96,
+            sqrtPriceX96Next
+        );
+        uint256 amountOut = uint256(-amountSpecified);
+
+        // account for protocol fees if turned on
+        uint256 amountInLessFee = uint256(zeroForOne ? amount0 : amount1);
+        uint256 fees = SwapMath.swapFees(amountInLessFee, fee);
+        amountIn = amountInLessFee + fees; // amount in required of swapper to send
+        if (amountIn > params.amountInMaximum) revert("Too much requested");
+
+        // account for protocol fees if turned on for amount in to pool
+        uint256 amountInToPool = amountIn;
+        if (feeProtocol > 0) amountInToPool -= uint256(fees / feeProtocol);
+
+        // calculate liquidity, sqrtP after
+        (liquidityAfter, sqrtPriceX96After) = LiquidityMath
+            .liquiditySqrtPriceX96Next(
+                liquidity,
+                sqrtPriceX96,
+                zeroForOne ? int256(amountInToPool) : -int256(amountOut),
+                zeroForOne ? -int256(amountOut) : int256(amountInToPool)
+            );
+    }
 
     /// @inheritdoc IQuoter
     function quoteExactOutput(

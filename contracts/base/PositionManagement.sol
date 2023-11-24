@@ -45,7 +45,7 @@ abstract contract PositionManagement is
         uint128 margin;
         uint128 sizeMinimum;
         uint128 debtMaximum;
-    }
+    } // TODO: amountInMaximum for specified limit on rewards + fees + margin
 
     /// @notice Opens a new position on pool
     function open(
