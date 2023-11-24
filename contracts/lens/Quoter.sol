@@ -149,6 +149,8 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
         uint256 fees = Position.fees(position.size, fee);
         uint256 rewards = Position.liquidationRewards(position.size, reward);
         amountIn = params.margin + fees + rewards;
+        if (amountIn > params.amountInMaximum)
+            revert("amountIn greater than max");
 
         // account for protocol fees *after* since taken from amountIn once transferred to pool
         if (feeProtocol > 0) fees -= uint256(fees / feeProtocol);

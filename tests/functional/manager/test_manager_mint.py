@@ -417,6 +417,51 @@ def test_manager_mint__when_debt_max_is_zero(
     assert token_id == 1  # token with ID 1 minted
 
 
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_mint__when_amount_in_max_is_zero(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    chain,
+):
+    state = pool_initialized_with_liquidity.state()
+    maintenance = pool_initialized_with_liquidity.maintenance()
+    oracle = pool_initialized_with_liquidity.oracle()
+
+    sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    reserve = reserve1 if zero_for_one else reserve0
+
+    size = reserve * 1 // 100  # 1% of reserves
+    margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
+    size_min = (size * 80) // 100
+    debt_max = 2**128 - 1
+    amount_in_max = 0
+    deadline = chain.pending_timestamp + 3600
+
+    mint_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        maintenance,
+        oracle,
+        zero_for_one,
+        size,
+        size_min,
+        debt_max,
+        amount_in_max,
+        sqrt_price_limit_x96,
+        margin,
+        sender.address,
+        deadline,
+    )
+    tx = manager.mint(mint_params, sender=sender)
+    token_id = tx.decode_logs(manager.Mint)[0].tokenId
+    assert token_id == 1  # token with ID 1 minted
+
+
 # TODO: new pool with weth9
 @pytest.mark.parametrize("zero_for_one", [True, False])
 def test_manager_mint__deposits_weth(zero_for_one, sender):
@@ -600,4 +645,75 @@ def test_manager_mint__reverts_when_debt_greater_than_max(
     )
 
     with reverts(manager.DebtGreaterThanMax, debt=debt):
+        manager.mint(mint_params, sender=sender)
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_mint__reverts_when_amount_in_greater_than_max(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    chain,
+    position_lib,
+    sqrt_price_math_lib,
+    position_amounts_lib,
+):
+    state = pool_initialized_with_liquidity.state()
+    maintenance = pool_initialized_with_liquidity.maintenance()
+    oracle = pool_initialized_with_liquidity.oracle()
+
+    sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    reserve = reserve1 if zero_for_one else reserve0
+
+    size = reserve * 1 // 100  # 1% of reserves
+    margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
+    size_min = (size * 80) // 100
+    deadline = chain.pending_timestamp + 3600
+
+    liquidity_delta = position_amounts_lib.getLiquidityForSize(
+        state.liquidity, state.sqrtPriceX96, maintenance, zero_for_one, size
+    )  # ~ 5% for 1% size
+
+    sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextOpen(
+        state.liquidity, state.sqrtPriceX96, liquidity_delta, zero_for_one, maintenance
+    )
+    position = position_lib.assemble(
+        state.liquidity,
+        state.sqrtPriceX96,
+        sqrt_price_x96_next,
+        liquidity_delta,
+        zero_for_one,
+        state.tick,
+        0,
+        0,
+        0,
+    )
+    fees = position_lib.fees(position.size, FEE)
+    rewards = position_lib.liquidationRewards(position.size, REWARD)
+
+    amount_in = margin + rewards + fees
+    amount_in_max = amount_in - 1
+    debt_max = 2**128 - 1
+
+    mint_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        maintenance,
+        oracle,
+        zero_for_one,
+        size,
+        size_min,
+        debt_max,
+        amount_in_max,
+        sqrt_price_limit_x96,
+        margin,
+        sender.address,
+        deadline,
+    )
+
+    with reverts(manager.AmountInGreaterThanMax, amountIn=amount_in):
         manager.mint(mint_params, sender=sender)
