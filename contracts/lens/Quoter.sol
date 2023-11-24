@@ -292,7 +292,7 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
                     tokenOut: tokenOut,
                     maintenance: maintenance,
                     oracle: oracle,
-                    recipient: params.recipient,
+                    recipient: params.recipient, // irrelevant
                     deadline: params.deadline,
                     amountIn: params.amountIn,
                     amountOutMinimum: 0,
@@ -315,7 +315,7 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
 
     /// @inheritdoc IQuoter
     function quoteExactOutputSingle(
-        IRouter.ExactOutputSingleParams calldata params
+        IRouter.ExactOutputSingleParams memory params
     )
         public
         view
@@ -412,7 +412,7 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
 
     /// @inheritdoc IQuoter
     function quoteExactOutput(
-        IRouter.ExactOutputParams calldata params
+        IRouter.ExactOutputParams memory params
     )
         external
         view
@@ -421,5 +421,48 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
             uint128[] memory liquiditiesAfter,
             uint160[] memory sqrtPricesX96After
         )
-    {}
+    {
+        uint256 numPools = params.path.numPools();
+        liquiditiesAfter = new uint128[](numPools);
+        sqrtPricesX96After = new uint160[](numPools);
+
+        uint256 i;
+        while (true) {
+            bool hasMultiplePools = params.path.hasMultiplePools();
+            (
+                address tokenOut,
+                address tokenIn,
+                uint24 maintenance,
+                address oracle
+            ) = params.path.decodeFirstPool();
+            (
+                params.amountOut,
+                liquiditiesAfter[i],
+                sqrtPricesX96After[i]
+            ) = quoteExactOutputSingle(
+                IRouter.ExactOutputSingleParams({
+                    tokenIn: tokenIn,
+                    tokenOut: tokenOut,
+                    maintenance: maintenance,
+                    oracle: oracle,
+                    recipient: params.recipient, // irrelevant
+                    deadline: params.deadline,
+                    amountOut: params.amountOut,
+                    amountInMaximum: 0,
+                    sqrtPriceLimitX96: 0
+                })
+            );
+            i++; // for lists
+
+            // exit out if reached end of path
+            if (hasMultiplePools) {
+                params.path = params.path.skipToken();
+            } else {
+                amountIn = params.amountOut;
+                break;
+            }
+        }
+
+        if (amountIn > params.amountInMaximum) revert("Too much requested");
+    }
 }
