@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity 0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -46,18 +46,31 @@ contract TestMarginalV1PoolCallee is
         int256 amount1Delta,
         address sender
     );
+    event AdjustReturn(uint256 margin0, uint256 margin1);
+    event MintReturn(uint256 shares, uint256 amount0, uint256 amount1);
+    event OpenReturn(
+        uint256 id,
+        uint256 size,
+        uint256 debt,
+        uint256 amount0,
+        uint256 amount1
+    );
+    event SettleReturn(int256 amount0, int256 amount1);
+    event SwapReturn(int256 amount0, int256 amount1);
+    event BurnReturn(uint128 liquidityDelta, uint256 amount0, uint256 amount1);
+    event LiquidateReturn(uint256 rewards0, uint256 rewards1);
 
     function mint(
         address pool,
         address recipient,
         uint128 liquidityDelta
     ) external returns (uint256 shares, uint256 amount0, uint256 amount1) {
-        return
-            IMarginalV1Pool(pool).mint(
-                recipient,
-                liquidityDelta,
-                abi.encode(msg.sender)
-            );
+        (shares, amount0, amount1) = IMarginalV1Pool(pool).mint(
+            recipient,
+            liquidityDelta,
+            abi.encode(msg.sender)
+        );
+        emit MintReturn(shares, amount0, amount1);
     }
 
     function marginalV1MintCallback(
@@ -90,16 +103,25 @@ contract TestMarginalV1PoolCallee is
         uint128 liquidityDelta,
         uint160 sqrtPriceLimitX96,
         uint128 margin
-    ) external returns (uint256 id, uint256 size, uint256 debt) {
-        return
-            IMarginalV1Pool(pool).open(
-                recipient,
-                zeroForOne,
-                liquidityDelta,
-                sqrtPriceLimitX96,
-                margin,
-                abi.encode(msg.sender)
-            );
+    )
+        external
+        returns (
+            uint256 id,
+            uint256 size,
+            uint256 debt,
+            uint256 amount0,
+            uint256 amount1
+        )
+    {
+        (id, size, debt, amount0, amount1) = IMarginalV1Pool(pool).open(
+            recipient,
+            zeroForOne,
+            liquidityDelta,
+            sqrtPriceLimitX96,
+            margin,
+            abi.encode(msg.sender)
+        );
+        emit OpenReturn(id, size, debt, amount0, amount1);
     }
 
     function marginalV1OpenCallback(
@@ -131,13 +153,13 @@ contract TestMarginalV1PoolCallee is
         uint96 id,
         int128 marginDelta
     ) external returns (uint256 margin0, uint256 margin1) {
-        return
-            IMarginalV1Pool(pool).adjust(
-                recipient,
-                id,
-                marginDelta,
-                abi.encode(msg.sender)
-            );
+        (margin0, margin1) = IMarginalV1Pool(pool).adjust(
+            recipient,
+            id,
+            marginDelta,
+            abi.encode(msg.sender)
+        );
+        emit AdjustReturn(margin0, margin1);
     }
 
     function marginalV1AdjustCallback(
@@ -168,8 +190,12 @@ contract TestMarginalV1PoolCallee is
         address recipient,
         uint96 id
     ) external returns (int256 amount0, int256 amount1) {
-        return
-            IMarginalV1Pool(pool).settle(recipient, id, abi.encode(msg.sender));
+        (amount0, amount1) = IMarginalV1Pool(pool).settle(
+            recipient,
+            id,
+            abi.encode(msg.sender)
+        );
+        emit SettleReturn(amount0, amount1);
     }
 
     function marginalV1SettleCallback(
@@ -205,14 +231,14 @@ contract TestMarginalV1PoolCallee is
         int256 amountSpecified,
         uint160 sqrtPriceLimitX96
     ) external returns (int256 amount0, int256 amount1) {
-        return
-            IMarginalV1Pool(pool).swap(
-                recipient,
-                zeroForOne,
-                amountSpecified,
-                sqrtPriceLimitX96,
-                abi.encode(msg.sender)
-            );
+        (amount0, amount1) = IMarginalV1Pool(pool).swap(
+            recipient,
+            zeroForOne,
+            amountSpecified,
+            sqrtPriceLimitX96,
+            abi.encode(msg.sender)
+        );
+        emit SwapReturn(amount0, amount1);
     }
 
     function marginalV1SwapCallback(
@@ -239,5 +265,35 @@ contract TestMarginalV1PoolCallee is
         } else {
             assert(amount0Delta == 0 && amount1Delta == 0);
         }
+    }
+
+    function burn(
+        address pool,
+        address recipient,
+        uint256 shares
+    )
+        external
+        returns (uint128 liquidityDelta, uint256 amount0, uint256 amount1)
+    {
+        IERC20(pool).safeTransferFrom(msg.sender, address(this), shares); // transfer in LP tokens to callee
+        (liquidityDelta, amount0, amount1) = IMarginalV1Pool(pool).burn(
+            recipient,
+            shares
+        );
+        emit BurnReturn(liquidityDelta, amount0, amount1);
+    }
+
+    function liquidate(
+        address pool,
+        address recipient,
+        address owner,
+        uint96 id
+    ) external returns (uint256 rewards0, uint256 rewards1) {
+        (rewards0, rewards1) = IMarginalV1Pool(pool).liquidate(
+            recipient,
+            owner,
+            id
+        );
+        emit LiquidateReturn(rewards0, rewards1);
     }
 }

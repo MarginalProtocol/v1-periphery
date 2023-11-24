@@ -38,7 +38,12 @@ contract NonfungiblePositionManager is
         _;
     }
 
-    event Mint(uint256 indexed tokenId, uint256 size, uint256 debt);
+    event Mint(
+        uint256 indexed tokenId,
+        uint256 size,
+        uint256 debt,
+        uint256 amountIn
+    );
     event Lock(uint256 indexed tokenId, uint256 marginAfter);
     event Free(uint256 indexed tokenId, uint256 marginAfter);
     event Burn(uint256 indexed tokenId, uint256 amountIn, uint256 amountOut);
@@ -89,7 +94,7 @@ contract NonfungiblePositionManager is
         external
         payable
         checkDeadline(params.deadline)
-        returns (uint256 tokenId, uint256 size, uint256 debt)
+        returns (uint256 tokenId, uint256 size, uint256 debt, uint256 amountIn)
     {
         IMarginalV1Pool pool = getPool(
             PoolAddress.PoolKey({
@@ -110,7 +115,9 @@ contract NonfungiblePositionManager is
         );
 
         uint256 positionId;
-        (positionId, size, debt) = open(
+        uint256 amount0;
+        uint256 amount1;
+        (positionId, size, debt, amount0, amount1) = open(
             OpenParams({
                 token0: params.token0,
                 token1: params.token1,
@@ -130,9 +137,13 @@ contract NonfungiblePositionManager is
                 sizeMinimum: params.sizeMinimum,
                 debtMaximum: params.debtMaximum == 0
                     ? type(uint128).max
-                    : params.debtMaximum
+                    : params.debtMaximum,
+                amountInMaximum: params.amountInMaximum == 0
+                    ? type(uint256).max
+                    : params.amountInMaximum
             })
         );
+        amountIn = amount0 > 0 ? amount0 : amount1;
 
         _mint(params.recipient, (tokenId = _nextId++));
 
@@ -141,7 +152,7 @@ contract NonfungiblePositionManager is
             id: uint96(positionId)
         });
 
-        emit Mint(tokenId, size, debt);
+        emit Mint(tokenId, size, debt, amountIn);
     }
 
     /// @notice Adds margin to an existing position, adjusting on pool

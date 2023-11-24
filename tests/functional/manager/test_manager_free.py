@@ -31,6 +31,7 @@ def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
         margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
         size_min = (size * 80) // 100
         debt_max = 2**128 - 1
+        amount_in_max = 2**256 - 1
         deadline = chain.pending_timestamp + 3600
 
         mint_params = (
@@ -42,6 +43,7 @@ def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
             size,
             size_min,
             debt_max,
+            amount_in_max,
             sqrt_price_limit_x96,
             margin,
             sender.address,

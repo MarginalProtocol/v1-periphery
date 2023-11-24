@@ -31,6 +31,7 @@ interface INonfungiblePositionManager is IERC721 {
         uint128 sizeDesired;
         uint128 sizeMinimum;
         uint128 debtMaximum;
+        uint256 amountInMaximum;
         uint160 sqrtPriceLimitX96;
         uint128 margin;
         address recipient;
@@ -40,7 +41,10 @@ interface INonfungiblePositionManager is IERC721 {
     /// @notice Mints a new position, opening on pool
     function mint(
         MintParams calldata params
-    ) external payable returns (uint256 tokenId, uint256 size, uint256 debt);
+    )
+        external
+        payable
+        returns (uint256 tokenId, uint256 size, uint256 debt, uint256 amountIn);
 
     struct LockParams {
         address token0;

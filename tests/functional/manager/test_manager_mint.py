@@ -38,6 +38,7 @@ def test_manager_mint__opens_position(
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
     debt_max = 2**128 - 1
+    amount_in_max = 2**256 - 1
     deadline = chain.pending_timestamp + 3600
 
     liquidity_delta = position_amounts_lib.getLiquidityForSize(
@@ -76,6 +77,7 @@ def test_manager_mint__opens_position(
         size,
         size_min,
         debt_max,
+        amount_in_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
@@ -112,6 +114,7 @@ def test_manager_mint__mints_token(
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
     debt_max = 2**128 - 1
+    amount_in_max = 2**256 - 1
     deadline = chain.pending_timestamp + 3600
 
     mint_params = (
@@ -123,6 +126,7 @@ def test_manager_mint__mints_token(
         size,
         size_min,
         debt_max,
+        amount_in_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
@@ -157,6 +161,7 @@ def test_manager_mint__sets_position_ref(
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
     debt_max = 2**128 - 1
+    amount_in_max = 2**256 - 1
     deadline = chain.pending_timestamp + 3600
 
     mint_params = (
@@ -168,6 +173,7 @@ def test_manager_mint__sets_position_ref(
         size,
         size_min,
         debt_max,
+        amount_in_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
@@ -216,6 +222,7 @@ def test_manager_mint__transfers_funds(
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
     debt_max = 2**128 - 1
+    amount_in_max = 2**256 - 1
     deadline = chain.pending_timestamp + 3600
 
     token = token1 if zero_for_one else token0
@@ -231,6 +238,7 @@ def test_manager_mint__transfers_funds(
         size,
         size_min,
         debt_max,
+        amount_in_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
@@ -261,6 +269,7 @@ def test_manager_mint__emits_mint(
     zero_for_one,
     sender,
     chain,
+    position_lib,
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
@@ -276,6 +285,7 @@ def test_manager_mint__emits_mint(
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
     debt_max = 2**128 - 1
+    amount_in_max = 2**256 - 1
     deadline = chain.pending_timestamp + 3600
 
     mint_params = (
@@ -287,6 +297,7 @@ def test_manager_mint__emits_mint(
         size,
         size_min,
         debt_max,
+        amount_in_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
@@ -300,6 +311,10 @@ def test_manager_mint__emits_mint(
     position = pool_initialized_with_liquidity.positions(key)
     debt = position.debt0 if zero_for_one else position.debt1
 
+    fees = position_lib.fees(position.size, FEE)
+    rewards = position_lib.liquidationRewards(position.size, REWARD)
+    amount_in = position.margin + rewards + fees
+
     next_id = 1
     events = tx.decode_logs(manager.Mint)
     assert len(events) == 1
@@ -308,6 +323,7 @@ def test_manager_mint__emits_mint(
     assert event.tokenId == next_id
     assert event.size == position.size
     assert event.debt == debt
+    assert event.amountIn == amount_in
     # assert tx.return_value == (next_id, position.size, debt)  # TODO: fix
 
 
@@ -333,6 +349,7 @@ def test_manager_mint__when_sqrt_price_limit_x96_is_zero(
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
     debt_max = 2**128 - 1
+    amount_in_max = 2**256 - 1
     deadline = chain.pending_timestamp + 3600
 
     mint_params = (
@@ -344,6 +361,7 @@ def test_manager_mint__when_sqrt_price_limit_x96_is_zero(
         size,
         size_min,
         debt_max,
+        amount_in_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
@@ -376,6 +394,7 @@ def test_manager_mint__when_debt_max_is_zero(
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
     debt_max = 0
+    amount_in_max = 2**256 - 1
     deadline = chain.pending_timestamp + 3600
 
     mint_params = (
@@ -387,6 +406,7 @@ def test_manager_mint__when_debt_max_is_zero(
         size,
         size_min,
         debt_max,
+        amount_in_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
@@ -425,6 +445,7 @@ def test_manager_mint__reverts_when_past_deadline(
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     size_min = (size * 80) // 100
     debt_max = 2**128 - 1
+    amount_in_max = 2**256 - 1
     deadline = chain.pending_timestamp - 1
 
     mint_params = (
@@ -436,6 +457,7 @@ def test_manager_mint__reverts_when_past_deadline(
         size,
         size_min,
         debt_max,
+        amount_in_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
@@ -470,6 +492,7 @@ def test_manager_mint__reverts_when_size_less_than_min(
     size = reserve * 1 // 100  # 1% of reserves
     margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
     debt_max = 2**128 - 1
+    amount_in_max = 2**256 - 1
     deadline = chain.pending_timestamp + 3600
 
     liquidity_delta = position_amounts_lib.getLiquidityForSize(
@@ -501,6 +524,7 @@ def test_manager_mint__reverts_when_size_less_than_min(
         size,
         size_min,
         debt_max,
+        amount_in_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,
@@ -557,6 +581,7 @@ def test_manager_mint__reverts_when_debt_greater_than_max(
     )
     debt = position.debt0 if zero_for_one else position.debt1
     debt_max = debt - 1
+    amount_in_max = 2**256 - 1
 
     mint_params = (
         pool_initialized_with_liquidity.token0(),
@@ -567,6 +592,7 @@ def test_manager_mint__reverts_when_debt_greater_than_max(
         size,
         size_min,
         debt_max,
+        amount_in_max,
         sqrt_price_limit_x96,
         margin,
         sender.address,

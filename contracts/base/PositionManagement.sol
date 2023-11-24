@@ -25,6 +25,7 @@ abstract contract PositionManagement is
 
     error SizeLessThanMin(uint256 size);
     error DebtGreaterThanMax(uint256 debt);
+    error AmountInGreaterThanMax(uint256 amountIn);
 
     /// @dev Returns the pool for the given token pair and maintenance. The pool contract may or may not exist.
     function getPool(
@@ -45,12 +46,22 @@ abstract contract PositionManagement is
         uint128 margin;
         uint128 sizeMinimum;
         uint128 debtMaximum;
-    } // TODO: amountInMaximum for specified limit on rewards + fees + margin
+        uint256 amountInMaximum;
+    }
 
     /// @notice Opens a new position on pool
     function open(
         OpenParams memory params
-    ) internal returns (uint256 id, uint256 size, uint256 debt) {
+    )
+        internal
+        returns (
+            uint256 id,
+            uint256 size,
+            uint256 debt,
+            uint256 amount0,
+            uint256 amount1
+        )
+    {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
@@ -59,7 +70,7 @@ abstract contract PositionManagement is
         });
         IMarginalV1Pool pool = getPool(poolKey);
 
-        (id, size, debt) = pool.open(
+        (id, size, debt, amount0, amount1) = pool.open(
             params.recipient,
             params.zeroForOne,
             params.liquidityDelta,
@@ -71,6 +82,10 @@ abstract contract PositionManagement is
         );
         if (size < uint256(params.sizeMinimum)) revert SizeLessThanMin(size);
         if (debt > uint256(params.debtMaximum)) revert DebtGreaterThanMax(debt);
+
+        uint256 amountIn = (!params.zeroForOne) ? amount0 : amount1; // in margin token
+        if (amountIn > params.amountInMaximum)
+            revert AmountInGreaterThanMax(amountIn);
     }
 
     function marginalV1OpenCallback(
