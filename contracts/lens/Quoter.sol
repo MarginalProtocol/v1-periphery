@@ -64,7 +64,7 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
         (
             uint128 liquidity,
             uint160 sqrtPriceX96,
-            ,
+            int24 tick,
             ,
             ,
             ,
@@ -122,7 +122,7 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
             sqrtPriceX96Next,
             liquidityDelta,
             params.zeroForOne,
-            0,
+            tick,
             0,
             0,
             0
