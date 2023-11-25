@@ -467,4 +467,6 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
 
         if (amountIn > params.amountInMaximum) revert("Too much requested");
     }
+
+    // TODO: quoteAddLiquidity, quoteRemoveLiquidity
 }

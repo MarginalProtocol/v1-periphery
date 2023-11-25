@@ -11,7 +11,7 @@ from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_quoter_quote_mint__returns_state(
+def test_quoter_quote_mint__quotes_mint(
     pool_initialized_with_liquidity,
     quoter,
     manager,
