@@ -54,6 +54,7 @@ abstract contract PositionManagement is
         OpenParams memory params
     )
         internal
+        virtual
         returns (
             uint256 id,
             uint256 size,
@@ -92,7 +93,7 @@ abstract contract PositionManagement is
         uint256 amount0Owed,
         uint256 amount1Owed,
         bytes calldata data
-    ) external {
+    ) external virtual {
         PositionCallbackData memory decoded = abi.decode(
             data,
             (PositionCallbackData)
@@ -118,7 +119,7 @@ abstract contract PositionManagement is
     /// @notice Adjusts margin backing position on pool
     function adjust(
         AdjustParams memory params
-    ) internal returns (uint256 margin0, uint256 margin1) {
+    ) internal virtual returns (uint256 margin0, uint256 margin1) {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
@@ -141,7 +142,7 @@ abstract contract PositionManagement is
         uint256 amount0Owed,
         uint256 amount1Owed,
         bytes calldata data
-    ) external {
+    ) external virtual {
         PositionCallbackData memory decoded = abi.decode(
             data,
             (PositionCallbackData)
@@ -166,7 +167,7 @@ abstract contract PositionManagement is
     /// @notice Settles a position on pool
     function settle(
         SettleParams memory params
-    ) internal returns (int256 amount0, int256 amount1) {
+    ) internal virtual returns (int256 amount0, int256 amount1) {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
@@ -188,7 +189,7 @@ abstract contract PositionManagement is
         int256 amount0Delta,
         int256 amount1Delta,
         bytes calldata data
-    ) external {
+    ) external virtual {
         if (amount0Delta <= 0 && amount1Delta <= 0) revert SizeLessThanMin(0); // can't settle position with zero size; Q: ok? necessary?
         PositionCallbackData memory decoded = abi.decode(
             data,
@@ -225,7 +226,7 @@ abstract contract PositionManagement is
     /// @notice Liquidates a position on pool
     function liquidate(
         LiquidateParams memory params
-    ) internal returns (uint256 rewards0, uint256 rewards1) {
+    ) internal virtual returns (uint256 rewards0, uint256 rewards1) {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,

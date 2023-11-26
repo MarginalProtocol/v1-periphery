@@ -43,7 +43,11 @@ abstract contract LiquidityManagement is
     /// @notice Mints liquidity on pool
     function mint(
         MintParams memory params
-    ) internal returns (uint256 shares, uint256 amount0, uint256 amount1) {
+    )
+        internal
+        virtual
+        returns (uint256 shares, uint256 amount0, uint256 amount1)
+    {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
@@ -68,7 +72,7 @@ abstract contract LiquidityManagement is
         uint256 amount0Owed,
         uint256 amount1Owed,
         bytes calldata data
-    ) external {
+    ) external virtual {
         LiquidityCallbackData memory decoded = abi.decode(
             data,
             (LiquidityCallbackData)
@@ -97,6 +101,7 @@ abstract contract LiquidityManagement is
         BurnParams memory params
     )
         internal
+        virtual
         returns (uint128 liquidityDelta, uint256 amount0, uint256 amount1)
     {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
