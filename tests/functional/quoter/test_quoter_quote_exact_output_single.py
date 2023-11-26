@@ -17,7 +17,6 @@ def test_quoter_quote_exact_output_single__quotes_swap(
     token1,
 ):
     state = pool_initialized_with_liquidity.state()
-    fee = pool_initialized_with_liquidity.fee()
     oracle = pool_initialized_with_liquidity.oracle()
 
     token_in = (
@@ -73,3 +72,6 @@ def test_quoter_quote_exact_output_single__quotes_swap(
     state = pool_initialized_with_liquidity.state()
     assert result.liquidityAfter == state.liquidity
     assert result.sqrtPriceX96After == state.sqrtPriceX96
+
+
+# TODO: test revert statements

@@ -125,3 +125,6 @@ def test_quoter_quote_exact_input__quotes_swap(
     state_two = pool_two_initialized_with_liquidity.state()
     assert result.liquiditiesAfter[1] == state_two.liquidity
     assert result.sqrtPricesX96After[1] == state_two.sqrtPriceX96
+
+
+# TODO: test revert statements

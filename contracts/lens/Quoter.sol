@@ -450,7 +450,7 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
                     recipient: params.recipient, // irrelevant
                     deadline: params.deadline,
                     amountOut: params.amountOut,
-                    amountInMaximum: 0,
+                    amountInMaximum: type(uint256).max,
                     sqrtPriceLimitX96: 0
                 })
             );
