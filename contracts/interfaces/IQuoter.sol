@@ -126,7 +126,7 @@ interface IQuoter {
         external
         view
         returns (
-            uint256 liquidityDelta,
+            uint128 liquidityDelta,
             uint256 amount0,
             uint256 amount1,
             uint128 liquidityAfter

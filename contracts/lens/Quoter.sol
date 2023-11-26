@@ -544,10 +544,53 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
         external
         view
         returns (
-            uint256 liquidityDelta,
+            uint128 liquidityDelta,
             uint256 amount0,
             uint256 amount1,
             uint128 liquidityAfter
         )
-    {}
+    {
+        IMarginalV1Pool pool = getPool(
+            PoolAddress.PoolKey({
+                token0: params.token0,
+                token1: params.token1,
+                maintenance: params.maintenance,
+                oracle: params.oracle
+            })
+        );
+
+        (
+            uint128 liquidity,
+            uint160 sqrtPriceX96,
+            ,
+            ,
+            ,
+            ,
+            ,
+            bool initialized
+        ) = pool.state();
+        if (!initialized) revert("Not initialized");
+
+        // cache needed pool state
+        uint256 totalSupply = pool.totalSupply();
+        uint128 liquidityLocked = pool.liquidityLocked();
+
+        if (params.shares == 0 || params.shares > totalSupply)
+            revert("Invalid shares");
+
+        uint128 totalLiquidityBefore = liquidity + liquidityLocked;
+        liquidityDelta = uint128(
+            Math.mulDiv(totalLiquidityBefore, params.shares, totalSupply)
+        );
+        if (liquidityDelta > liquidity) revert("Invalid liquidityDelta");
+
+        (amount0, amount1) = LiquidityMath.toAmounts(
+            liquidityDelta,
+            sqrtPriceX96
+        );
+        if (amount0 < params.amount0Min) revert("amount0 less than min");
+        if (amount1 < params.amount1Min) revert("amount1 less than min");
+
+        liquidityAfter = liquidity - liquidityDelta;
+    }
 }
