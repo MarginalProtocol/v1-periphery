@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity =0.8.15;
 
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+
 import {PeripheryValidation} from "@uniswap/v3-periphery/contracts/base/PeripheryValidation.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
@@ -10,6 +12,7 @@ import {SwapMath} from "@marginal/v1-core/contracts/libraries/SwapMath.sol";
 import {SqrtPriceMath} from "@marginal/v1-core/contracts/libraries/SqrtPriceMath.sol";
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
 
+import {LiquidityAmounts} from "../libraries/LiquidityAmounts.sol";
 import {PeripheryImmutableState} from "../base/PeripheryImmutableState.sol";
 import {Path} from "../libraries/Path.sol";
 import {PoolAddress} from "../libraries/PoolAddress.sol";
@@ -480,7 +483,59 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
             uint256 amount1,
             uint128 liquidityAfter
         )
-    {}
+    {
+        IMarginalV1Pool pool = getPool(
+            PoolAddress.PoolKey({
+                token0: params.token0,
+                token1: params.token1,
+                maintenance: params.maintenance,
+                oracle: params.oracle
+            })
+        );
+
+        (
+            uint128 liquidity,
+            uint160 sqrtPriceX96,
+            ,
+            ,
+            ,
+            ,
+            ,
+            bool initialized
+        ) = pool.state();
+        if (!initialized) revert("Not initialized");
+
+        uint128 liquidityDelta = LiquidityAmounts.getLiquidityForAmounts(
+            sqrtPriceX96,
+            params.amount0Desired,
+            params.amount1Desired
+        );
+        if (liquidityDelta == 0) revert("Invalid liquidityDelta");
+
+        // cache needed pool state
+        uint256 totalSupply = pool.totalSupply();
+        uint128 liquidityLocked = pool.liquidityLocked();
+
+        (amount0, amount1) = LiquidityMath.toAmounts(
+            liquidityDelta,
+            sqrtPriceX96
+        );
+        if (amount0 < params.amount0Min) revert("amount0 less than min");
+        if (amount1 < params.amount1Min) revert("amount1 less than min");
+
+        uint128 totalLiquidityAfter = liquidity +
+            liquidityLocked +
+            liquidityDelta;
+        shares = totalSupply == 0
+            ? totalLiquidityAfter
+            : Math.mulDiv(
+                totalSupply,
+                liquidityDelta,
+                totalLiquidityAfter - liquidityDelta
+            );
+
+        liquidityAfter = liquidity + liquidityDelta;
+    }
 
     /// @inheritdoc IQuoter
     function quoteRemoveLiquidity(
