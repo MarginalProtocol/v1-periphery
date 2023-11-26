@@ -43,6 +43,12 @@ interface IQuoter {
             uint160 sqrtPriceX96After
         );
 
+    /// @notice Quotes the amountOut result of Router::exactInput
+    /// @param params Param inputs to Router::exactInput
+    /// @dev Reverts if exactInput would revert
+    /// @return amountOut Amount of token received from pool after swap
+    /// @return liquiditiesAfter Pool liquidities after swap
+    /// @return sqrtPricesX96After Pool sqrt prices after swap
     function quoteExactInput(
         IRouter.ExactInputParams calldata params
     )
@@ -54,6 +60,12 @@ interface IQuoter {
             uint160[] memory sqrtPricesX96After
         );
 
+    /// @notice Quotes the amountIn result of Router::exactOutputSingle
+    /// @param params Param inputs to Router::exactOutputSingle
+    /// @dev Reverts if exactOutputSingle would revert
+    /// @return amountIn Amount of token sent to pool for swap
+    /// @return liquidityAfter Pool liquidity after swap
+    /// @return sqrtPriceX96After Pool sqrt price after swap
     function quoteExactOutputSingle(
         IRouter.ExactOutputSingleParams calldata params
     )
@@ -65,6 +77,12 @@ interface IQuoter {
             uint160 sqrtPriceX96After
         );
 
+    /// @notice Quotes the amountIn result of Router::exactOutput
+    /// @param params Param inputs to Router::exactOutput
+    /// @dev Reverts if exactOutput would revert
+    /// @return amountIn Amount of token sent to pool for swap
+    /// @return liquiditiesAfter Pool liquidities after swap
+    /// @return sqrtPricesX96After Pool sqrt prices after swap
     function quoteExactOutput(
         IRouter.ExactOutputParams calldata params
     )
@@ -74,5 +92,43 @@ interface IQuoter {
             uint256 amountIn,
             uint128[] memory liquiditiesAfter,
             uint160[] memory sqrtPricesX96After
+        );
+
+    /// @notice Quotes the amounts in result of Router::addLiquidity
+    /// @param params Param inputs to Router::addLiquidity
+    /// @dev Reverts if addLiquidity would revert
+    /// @return shares Amount of lp token minted by pool
+    /// @return amount0 Amount of token0 sent to pool for adding liquidity
+    /// @return amount1 Amount of token1 sent to pool for adding liquidity
+    /// @return liquidityAfter Pool liquidity after adding liquidity
+    function quoteAddLiquidity(
+        IRouter.AddLiquidityParams memory params
+    )
+        external
+        view
+        returns (
+            uint256 shares,
+            uint256 amount0,
+            uint256 amount1,
+            uint128 liquidityAfter
+        );
+
+    /// @notice Quotes the amounts in result of Router::removeLiquidity
+    /// @param params Param inputs to Router::removeLiquidity
+    /// @dev Reverts if removeLiquidity would revert
+    /// @return liquidityDelta Amount of liquidity removed from pool
+    /// @return amount0 Amount of token0 received from pool for removing liquidity
+    /// @return amount1 Amount of token1 received from pool for removing liquidity
+    /// @return liquidityAfter Pool liquidity after removing liquidity
+    function quoteRemoveLiquidity(
+        IRouter.RemoveLiquidityParams memory params
+    )
+        external
+        view
+        returns (
+            uint256 liquidityDelta,
+            uint256 amount0,
+            uint256 amount1,
+            uint128 liquidityAfter
         );
 }

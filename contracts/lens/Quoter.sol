@@ -468,5 +468,31 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
         if (amountIn > params.amountInMaximum) revert("Too much requested");
     }
 
-    // TODO: quoteAddLiquidity, quoteRemoveLiquidity
+    /// @inheritdoc IQuoter
+    function quoteAddLiquidity(
+        IRouter.AddLiquidityParams memory params
+    )
+        external
+        view
+        returns (
+            uint256 shares,
+            uint256 amount0,
+            uint256 amount1,
+            uint128 liquidityAfter
+        )
+    {}
+
+    /// @inheritdoc IQuoter
+    function quoteRemoveLiquidity(
+        IRouter.RemoveLiquidityParams memory params
+    )
+        external
+        view
+        returns (
+            uint256 liquidityDelta,
+            uint256 amount0,
+            uint256 amount1,
+            uint128 liquidityAfter
+        )
+    {}
 }
