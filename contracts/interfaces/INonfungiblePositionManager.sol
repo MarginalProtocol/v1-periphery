@@ -7,6 +7,16 @@ import {IPeripheryImmutableState} from "./IPeripheryImmutableState.sol";
 import {IPeripheryPayments} from "./IPeripheryPayments.sol";
 
 interface INonfungiblePositionManager is IERC721 {
+    /// @notice Returns details of an existing position
+    /// @param tokenId The NFT token id associated with the position
+    /// @dev Do *NOT* use in callback. Vulnerable to re-entrancy view issues.
+    /// @return pool The pool address position taken out on
+    /// @return positionId The position ID stored in the pool for the associated position
+    /// @return zeroForOne Whether position settlement requires debt in of token0 for size + margin out of token1
+    /// @return size The position size on the pool in the margin token
+    /// @return debt The position debt owed to the pool in the non-margin token
+    /// @return margin The margin backing the position on the pool
+    /// @return liquidated Whether the position has been liquidated
     function positions(
         uint256 tokenId
     )
@@ -39,6 +49,11 @@ interface INonfungiblePositionManager is IERC721 {
     }
 
     /// @notice Mints a new position, opening on pool
+    /// @param params The parameters necessary for the position mint, encoded as `MintParams` in calldata
+    /// @return tokenId The NFT token id associated with the minted position
+    /// @return size The position size on the pool in the margin token
+    /// @return debt The position debt owed to the pool in the non-margin token
+    /// @return amountIn The amount of margin token in used to open the position, including fees and liquidation rewards set aside in pool
     function mint(
         MintParams calldata params
     )
@@ -58,6 +73,8 @@ interface INonfungiblePositionManager is IERC721 {
     }
 
     /// @dev Adds margin to an existing position
+    /// @param params The parameters necessary for adding margin to the position, encoded as `LockParams` in calldata
+    /// @return margin The margin backing the position after calling lock
     function lock(
         LockParams calldata params
     ) external payable returns (uint256 margin);
@@ -74,6 +91,8 @@ interface INonfungiblePositionManager is IERC721 {
     }
 
     /// @notice Removes margin from an existing position
+    /// @param params The parameters necessary for removing margin from the position, encoded as `FreeParams` in calldata
+    /// @return margin The margin backing the position after calling free
     function free(
         FreeParams calldata params
     ) external payable returns (uint256 margin);
@@ -89,6 +108,9 @@ interface INonfungiblePositionManager is IERC721 {
     }
 
     /// @notice Burns an existing position, settling on pool
+    /// @param params The parameters necessary for settling the position, encoded as `BurnParams` in calldata
+    /// @return amountIn The amount of debt token in used to settle position
+    /// @return amountOut The amount of margin token received after settling position
     function burn(
         BurnParams calldata params
     ) external payable returns (uint256 amountIn, uint256 amountOut);
@@ -104,6 +126,8 @@ interface INonfungiblePositionManager is IERC721 {
     }
 
     /// @notice Grabs an existing position, liquidating on pool
+    /// @param params The parameters necessary for liquidating a position, encoded as `GrabParams` in calldata
+    /// @return rewards The liquidation rewards received after liquidating the position
     function grab(
         GrabParams calldata params
     ) external payable returns (uint256 rewards);

@@ -60,8 +60,7 @@ contract NonfungiblePositionManager is
         PeripheryImmutableState(_factory, _WETH9)
     {}
 
-    /// @dev Do *NOT* use in callback. Vulnerable to re-entrancy view issues.
-    // TODO: check re-entrancy issues
+    /// @inheritdoc INonfungiblePositionManager
     function positions(
         uint256 tokenId
     )
@@ -77,6 +76,7 @@ contract NonfungiblePositionManager is
             bool liquidated
         )
     {
+        // TODO: check re-entrancy view issues
         Position memory position = _positions[tokenId];
         pool = position.pool;
         positionId = position.id;
@@ -87,7 +87,7 @@ contract NonfungiblePositionManager is
         );
     }
 
-    /// @notice Mints a new position, opening on pool
+    /// @inheritdoc INonfungiblePositionManager
     function mint(
         MintParams calldata params
     )
@@ -155,7 +155,7 @@ contract NonfungiblePositionManager is
         emit Mint(tokenId, size, debt, amountIn);
     }
 
-    /// @notice Adds margin to an existing position, adjusting on pool
+    /// @inheritdoc INonfungiblePositionManager
     function lock(
         LockParams calldata params
     )
@@ -195,7 +195,7 @@ contract NonfungiblePositionManager is
         emit Lock(params.tokenId, margin);
     }
 
-    /// @notice Removes margin from an existing position, adjusting on pool
+    /// @inheritdoc INonfungiblePositionManager
     function free(
         FreeParams calldata params
     )
@@ -235,7 +235,7 @@ contract NonfungiblePositionManager is
         emit Free(params.tokenId, margin);
     }
 
-    /// @notice Burns an existing position, settling on pool
+    /// @inheritdoc INonfungiblePositionManager
     function burn(
         BurnParams calldata params
     )
@@ -283,7 +283,7 @@ contract NonfungiblePositionManager is
         emit Burn(params.tokenId, amountIn, amountOut);
     }
 
-    /// @notice Grabs an existing position, liquidating on pool
+    /// @inheritdoc INonfungiblePositionManager
     function grab(
         GrabParams calldata params
     )
