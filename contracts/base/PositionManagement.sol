@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity =0.8.15;
 
+import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
+import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
+import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+
 import {IMarginalV1AdjustCallback} from "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1AdjustCallback.sol";
 import {IMarginalV1OpenCallback} from "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1OpenCallback.sol";
 import {IMarginalV1SettleCallback} from "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1SettleCallback.sol";
@@ -15,6 +19,7 @@ abstract contract PositionManagement is
     IMarginalV1AdjustCallback,
     IMarginalV1OpenCallback,
     IMarginalV1SettleCallback,
+    IUniswapV3SwapCallback,
     PeripheryImmutableState,
     PeripheryPayments
 {
@@ -26,6 +31,7 @@ abstract contract PositionManagement is
     error SizeLessThanMin(uint256 size);
     error DebtGreaterThanMax(uint256 debt);
     error AmountInGreaterThanMax(uint256 amountIn);
+    error AmountOutLessThanMin(uint256 amountOut);
 
     /// @dev Returns the pool for the given token pair and maintenance. The pool contract may or may not exist.
     function getPool(
@@ -89,6 +95,7 @@ abstract contract PositionManagement is
             revert AmountInGreaterThanMax(amountIn);
     }
 
+    /// @inheritdoc IMarginalV1OpenCallback
     function marginalV1OpenCallback(
         uint256 amount0Owed,
         uint256 amount1Owed,
@@ -138,6 +145,7 @@ abstract contract PositionManagement is
         );
     }
 
+    /// @inheritdoc IMarginalV1AdjustCallback
     function marginalV1AdjustCallback(
         uint256 amount0Owed,
         uint256 amount1Owed,
@@ -164,7 +172,7 @@ abstract contract PositionManagement is
         uint96 id;
     }
 
-    /// @notice Settles a position on pool
+    /// @notice Settles a position on pool via external payer of debt
     function settle(
         SettleParams memory params
     ) internal virtual returns (int256 amount0, int256 amount1) {
@@ -185,6 +193,44 @@ abstract contract PositionManagement is
         );
     }
 
+    struct FlashParams {
+        address token0;
+        address token1;
+        uint24 maintenance;
+        address oracle;
+        address recipient;
+        uint96 id;
+        uint256 amountOutMinimum;
+    }
+
+    /// @notice Settles a position by repaying debt with portion of size swapped through spot
+    function flash(
+        FlashParams memory params
+    ) internal virtual returns (uint256 amountOut) {
+        PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
+            token0: params.token0,
+            token1: params.token1,
+            maintenance: params.maintenance,
+            oracle: params.oracle
+        });
+        IMarginalV1Pool pool = getPool(poolKey);
+
+        address payer = address(this);
+        (int256 amount0, int256 amount1) = pool.settle(
+            payer,
+            params.id,
+            abi.encode(PositionCallbackData({poolKey: poolKey, payer: payer}))
+        );
+
+        address tokenOut = amount0 < 0 ? params.token0 : params.token1;
+        amountOut = balance(tokenOut);
+
+        if (amountOut < params.amountOutMinimum)
+            revert AmountOutLessThanMin(amountOut);
+        if (amountOut > 0) pay(tokenOut, payer, params.recipient, amountOut);
+    }
+
+    /// @inheritdoc IMarginalV1SettleCallback
     function marginalV1SettleCallback(
         int256 amount0Delta,
         int256 amount1Delta,
@@ -197,17 +243,63 @@ abstract contract PositionManagement is
         );
         CallbackValidation.verifyCallback(factory, decoded.poolKey);
 
+        if (decoded.payer == address(this)) {
+            // swap portion of flashed size through spot to repay debt
+            bool zeroForOne = amount1Delta > 0; // owe 1 to marginal if true
+            IUniswapV3Pool(decoded.poolKey.oracle).swap(
+                msg.sender,
+                zeroForOne,
+                (zeroForOne ? -amount1Delta : -amount0Delta),
+                (
+                    zeroForOne
+                        ? TickMath.MIN_SQRT_RATIO + 1
+                        : TickMath.MAX_SQRT_RATIO - 1
+                ),
+                abi.encode(decoded.poolKey)
+            );
+        } else {
+            // simply pay debt from external payer
+            if (amount0Delta > 0)
+                pay(
+                    decoded.poolKey.token0,
+                    decoded.payer,
+                    msg.sender,
+                    uint256(amount0Delta)
+                );
+            if (amount1Delta > 0)
+                pay(
+                    decoded.poolKey.token1,
+                    decoded.payer,
+                    msg.sender,
+                    uint256(amount1Delta)
+                );
+        }
+    }
+
+    /// @inheritdoc IUniswapV3SwapCallback
+    function uniswapV3SwapCallback(
+        int256 amount0Delta,
+        int256 amount1Delta,
+        bytes calldata data
+    ) external virtual {
+        require(amount0Delta > 0 || amount1Delta > 0); // swaps entirely within 0-liquidity regions are not supported
+        PoolAddress.PoolKey memory poolKey = abi.decode(
+            data,
+            (PoolAddress.PoolKey)
+        );
+        CallbackValidation.verifyUniswapV3Callback(factory, poolKey);
+
         if (amount0Delta > 0)
             pay(
-                decoded.poolKey.token0,
-                decoded.payer,
+                poolKey.token0,
+                address(this),
                 msg.sender,
                 uint256(amount0Delta)
             );
         if (amount1Delta > 0)
             pay(
-                decoded.poolKey.token1,
-                decoded.payer,
+                poolKey.token1,
+                address(this),
                 msg.sender,
                 uint256(amount1Delta)
             );

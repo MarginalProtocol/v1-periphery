@@ -47,6 +47,7 @@ contract NonfungiblePositionManager is
     event Lock(uint256 indexed tokenId, uint256 marginAfter);
     event Free(uint256 indexed tokenId, uint256 marginAfter);
     event Burn(uint256 indexed tokenId, uint256 amountIn, uint256 amountOut);
+    event Ignite(uint256 indexed tokenId, uint256 amountOut);
     event Grab(uint256 indexed tokenId, uint256 rewards);
 
     error Unauthorized();
@@ -283,6 +284,49 @@ contract NonfungiblePositionManager is
         _burn(params.tokenId);
 
         emit Burn(params.tokenId, amountIn, amountOut);
+    }
+
+    /// @inheritdoc INonfungiblePositionManager
+    function ignite(
+        IgniteParams calldata params
+    )
+        external
+        payable
+        onlyApprovedOrOwner(params.tokenId)
+        checkDeadline(params.deadline)
+        returns (uint256 amountOut)
+    {
+        Position memory position = _positions[params.tokenId];
+        if (
+            address(
+                getPool(
+                    PoolAddress.PoolKey({
+                        token0: params.token0,
+                        token1: params.token1,
+                        maintenance: params.maintenance,
+                        oracle: params.oracle
+                    })
+                )
+            ) != position.pool
+        ) revert InvalidPoolKey();
+
+        amountOut = flash(
+            FlashParams({
+                token0: params.token0,
+                token1: params.token1,
+                maintenance: params.maintenance,
+                oracle: params.oracle,
+                recipient: params.recipient,
+                id: position.id,
+                amountOutMinimum: params.amountOutMinimum
+            })
+        );
+
+        delete _positions[params.tokenId];
+
+        _burn(params.tokenId);
+
+        emit Ignite(params.tokenId, amountOut);
     }
 
     /// @inheritdoc INonfungiblePositionManager

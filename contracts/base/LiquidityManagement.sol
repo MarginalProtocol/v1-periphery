@@ -68,6 +68,7 @@ abstract contract LiquidityManagement is
         if (amount1 < params.amount1Min) revert Amount1LessThanMin(amount1);
     }
 
+    /// @inheritdoc IMarginalV1MintCallback
     function marginalV1MintCallback(
         uint256 amount0Owed,
         uint256 amount1Owed,

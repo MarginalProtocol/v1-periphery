@@ -74,4 +74,11 @@ abstract contract PeripheryPayments is
             TransferHelper.safeTransferFrom(token, payer, recipient, value);
         }
     }
+
+    /// @notice Balance of token held by this contract
+    /// @param token The token to check
+    /// @return value The balance amount
+    function balance(address token) internal view returns (uint256 value) {
+        return IERC20(token).balanceOf(address(this));
+    }
 }

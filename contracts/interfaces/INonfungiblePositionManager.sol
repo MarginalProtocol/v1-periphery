@@ -107,13 +107,31 @@ interface INonfungiblePositionManager is IERC721 {
         uint256 deadline;
     }
 
-    /// @notice Burns an existing position, settling on pool
+    /// @notice Burns an existing position, settling on pool via external payer
     /// @param params The parameters necessary for settling the position, encoded as `BurnParams` in calldata
     /// @return amountIn The amount of debt token in used to settle position
     /// @return amountOut The amount of margin token received after settling position
     function burn(
         BurnParams calldata params
     ) external payable returns (uint256 amountIn, uint256 amountOut);
+
+    struct IgniteParams {
+        address token0;
+        address token1;
+        uint24 maintenance;
+        address oracle;
+        uint256 tokenId;
+        uint256 amountOutMinimum;
+        address recipient;
+        uint256 deadline;
+    }
+
+    /// @notice Burns an existing position, settling on pool via swap through spot
+    /// @param params The parameters necessary for settling the position, encoded as `IgniteParams` in calldata
+    /// @return amountOut The amount of margin token received after settling position
+    function ignite(
+        IgniteParams calldata params
+    ) external payable returns (uint256 amountOut);
 
     struct GrabParams {
         address token0;
