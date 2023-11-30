@@ -1,5 +1,8 @@
 import pytest
 
+from ape import reverts
+from ape.utils import ZERO_ADDRESS
+
 from utils.constants import (
     MIN_SQRT_RATIO,
     MAX_SQRT_RATIO,
@@ -245,3 +248,154 @@ def test_manager_ignite__transfers_funds(
         token_in.balanceOf(spot_pool_initialized_with_liquidity.address)
         == balance_in_spot_pool - amount_in
     )
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_ignite__deletes_manager_position(
+    pool_initialized_with_liquidity,
+    spot_pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    position_lib,
+    mint_position,
+):
+    token_id = mint_position(zero_for_one)
+
+    manager_position = manager.positions(token_id)
+    assert manager_position.pool != ZERO_ADDRESS
+
+    deadline = chain.pending_timestamp + 3600
+    amount_out_min = 0
+
+    ignite_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        pool_initialized_with_liquidity.oracle(),
+        token_id,
+        amount_out_min,
+        alice.address,
+        deadline,
+    )
+    manager.ignite(ignite_params, sender=sender)
+
+    # view should revert since Position struct has ZERO_ADDRESS for pool
+    with reverts():
+        manager.positions(token_id)
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_ignite__burns_token(
+    pool_initialized_with_liquidity,
+    spot_pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    position_lib,
+    mint_position,
+):
+    token_id = mint_position(zero_for_one)
+    assert manager.ownerOf(token_id) == sender.address
+    assert manager.balanceOf(sender.address) > 0
+
+    deadline = chain.pending_timestamp + 3600
+    amount_out_min = 0
+
+    ignite_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        pool_initialized_with_liquidity.maintenance(),
+        pool_initialized_with_liquidity.oracle(),
+        token_id,
+        amount_out_min,
+        alice.address,
+        deadline,
+    )
+    manager.ignite(ignite_params, sender=sender)
+
+    assert manager.balanceOf(sender.address) == 0
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_ignite__emits_ignite(
+    pool_initialized_with_liquidity,
+    spot_pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    position_lib,
+    mint_position,
+):
+    pass
+
+
+# TODO:
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_ignite__deposits_weth(zero_for_one):
+    pass
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_ignite__reverts_when_not_owner(
+    pool_initialized_with_liquidity,
+    spot_pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    mint_position,
+):
+    pass
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_ignite__reverts_when_past_deadline(
+    pool_initialized_with_liquidity,
+    spot_pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    position_lib,
+    mint_position,
+):
+    pass
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_ignite__reverts_when_invalid_pool_key(
+    pool_initialized_with_liquidity,
+    spot_pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    position_lib,
+    mint_position,
+):
+    pass
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_ignite__reverts_when_amount_less_than_min(
+    pool_initialized_with_liquidity,
+    spot_pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    alice,
+    chain,
+    position_lib,
+    mint_position,
+):
+    pass
