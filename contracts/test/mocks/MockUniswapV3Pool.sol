@@ -53,6 +53,16 @@ contract MockUniswapV3Pool {
 
     uint128 public liquidity;
 
+    event Swap(
+        address indexed sender,
+        address indexed recipient,
+        int256 amount0,
+        int256 amount1,
+        uint160 sqrtPriceX96,
+        uint128 liquidity,
+        int24 tick
+    );
+
     constructor(address tokenA, address tokenB, uint24 _fee) {
         (address _token0, address _token1) = tokenA < tokenB
             ? (tokenA, tokenB)
@@ -249,5 +259,15 @@ contract MockUniswapV3Pool {
         }
 
         slot0 = _slot0;
+
+        emit Swap(
+            msg.sender,
+            recipient,
+            amount0,
+            amount1,
+            slot0.sqrtPriceX96,
+            liquidity,
+            slot0.tick
+        );
     }
 }
