@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity 0.8.17;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
+import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
+
+import {LiquidityMath} from "@marginal/v1-core/contracts/libraries/LiquidityMath.sol";
+import {SqrtPriceMath} from "@marginal/v1-core/contracts/libraries/SqrtPriceMath.sol";
+import {SwapMath} from "@marginal/v1-core/contracts/libraries/SwapMath.sol";
+import {TransferHelper} from "@marginal/v1-core/contracts/libraries/TransferHelper.sol";
+
 contract MockUniswapV3Pool {
     address public immutable token0;
     address public immutable token1;
@@ -34,6 +44,15 @@ contract MockUniswapV3Pool {
     }
     Slot0 public slot0;
 
+    // accumulated protocol fees in token0/token1 units
+    struct ProtocolFees {
+        uint128 token0;
+        uint128 token1;
+    }
+    ProtocolFees public protocolFees;
+
+    uint128 public liquidity;
+
     constructor(address tokenA, address tokenB, uint24 _fee) {
         (address _token0, address _token1) = tokenA < tokenB
             ? (tokenA, tokenB)
@@ -45,6 +64,10 @@ contract MockUniswapV3Pool {
 
     function setSlot0(Slot0 memory _slot0) external {
         slot0 = _slot0;
+    }
+
+    function setLiquidity(uint128 _liquidity) external {
+        liquidity = _liquidity;
     }
 
     function pushObservation(
@@ -97,5 +120,134 @@ contract MockUniswapV3Pool {
         uint16 observationCardinalityNext
     ) external {
         slot0.observationCardinalityNext = observationCardinalityNext;
+    }
+
+    /// @dev simple swap similar to marginal pool
+    function swap(
+        address recipient,
+        bool zeroForOne,
+        int256 amountSpecified,
+        uint160 sqrtPriceLimitX96,
+        bytes calldata data
+    ) external returns (int256 amount0, int256 amount1) {
+        Slot0 memory _slot0 = slot0;
+        uint128 _liquidity = liquidity;
+
+        require(amountSpecified != 0, "invalid amount specified");
+        require(
+            zeroForOne
+                ? (sqrtPriceLimitX96 < _slot0.sqrtPriceX96 &&
+                    sqrtPriceLimitX96 > SqrtPriceMath.MIN_SQRT_RATIO)
+                : (sqrtPriceLimitX96 > _slot0.sqrtPriceX96 &&
+                    sqrtPriceLimitX96 < SqrtPriceMath.MAX_SQRT_RATIO),
+            "invalid sqrtPriceLimitX96"
+        );
+        bool exactInput = amountSpecified > 0;
+        int256 amountSpecifiedLessFee = exactInput
+            ? amountSpecified -
+                int256(SwapMath.swapFees(uint256(amountSpecified), fee))
+            : amountSpecified;
+
+        uint160 sqrtPriceX96Next = SqrtPriceMath.sqrtPriceX96NextSwap(
+            _liquidity,
+            _slot0.sqrtPriceX96,
+            zeroForOne,
+            amountSpecifiedLessFee
+        );
+        require(
+            zeroForOne
+                ? sqrtPriceX96Next >= sqrtPriceLimitX96
+                : sqrtPriceX96Next <= sqrtPriceLimitX96,
+            "sqrtPriceX96 exceeds limit"
+        );
+
+        (amount0, amount1) = SwapMath.swapAmounts(
+            _liquidity,
+            _slot0.sqrtPriceX96,
+            sqrtPriceX96Next
+        );
+        if (!zeroForOne) {
+            amount0 = !exactInput ? amountSpecified : amount0;
+            if (amount0 < 0)
+                TransferHelper.safeTransfer(
+                    token0,
+                    recipient,
+                    uint256(-amount0)
+                );
+            uint256 fees1 = exactInput
+                ? uint256(amountSpecified) - uint256(amount1)
+                : SwapMath.swapFees(uint256(amount1), fee);
+            amount1 += int256(fees1);
+
+            uint256 balance1Before = IERC20(token1).balanceOf(address(this));
+            IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(
+                amount0,
+                amount1,
+                data
+            );
+            require(
+                balance1Before + uint256(amount1) <=
+                    IERC20(token1).balanceOf(address(this)),
+                "amount1 less than min"
+            );
+
+            uint256 delta = _slot0.feeProtocol > 0
+                ? fees1 / _slot0.feeProtocol
+                : 0;
+            if (delta > 0) protocolFees.token1 += uint128(delta);
+
+            (uint128 liquidityAfter, uint160 sqrtPriceX96After) = LiquidityMath
+                .liquiditySqrtPriceX96Next(
+                    _liquidity,
+                    _slot0.sqrtPriceX96,
+                    amount0,
+                    amount1 - int256(delta)
+                );
+            liquidity = liquidityAfter;
+            _slot0.sqrtPriceX96 = sqrtPriceX96After;
+            _slot0.tick = TickMath.getTickAtSqrtRatio(sqrtPriceX96After);
+        } else {
+            amount1 = !exactInput ? amountSpecified : amount1;
+            if (amount1 < 0)
+                TransferHelper.safeTransfer(
+                    token1,
+                    recipient,
+                    uint256(-amount1)
+                );
+            uint256 fees0 = exactInput
+                ? uint256(amountSpecified) - uint256(amount0)
+                : SwapMath.swapFees(uint256(amount0), fee);
+            amount0 += int256(fees0);
+
+            uint256 balance0Before = IERC20(token0).balanceOf(address(this));
+            IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(
+                amount0,
+                amount1,
+                data
+            );
+            require(
+                balance0Before + uint256(amount0) <=
+                    IERC20(token0).balanceOf(address(this)),
+                "amount0 less than min"
+            );
+
+            uint256 delta = _slot0.feeProtocol > 0
+                ? fees0 / _slot0.feeProtocol
+                : 0;
+            if (delta > 0) protocolFees.token0 += uint128(delta);
+
+            (uint128 liquidityAfter, uint160 sqrtPriceX96After) = LiquidityMath
+                .liquiditySqrtPriceX96Next(
+                    _liquidity,
+                    _slot0.sqrtPriceX96,
+                    amount0 - int256(delta),
+                    amount1
+                );
+            liquidity = liquidityAfter;
+            _slot0.sqrtPriceX96 = sqrtPriceX96After;
+            _slot0.tick = TickMath.getTickAtSqrtRatio(sqrtPriceX96After);
+        }
+
+        slot0 = _slot0;
     }
 }
