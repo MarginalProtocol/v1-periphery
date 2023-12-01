@@ -80,6 +80,7 @@ contract NonfungiblePositionManager is
         )
     {
         // TODO: check re-entrancy view issues
+        // TODO: return min margin requirement?
         Position memory position = _positions[tokenId];
         pool = position.pool;
         positionId = position.id;
