@@ -76,19 +76,24 @@ contract NonfungiblePositionManager is
             uint128 size,
             uint128 debt,
             uint128 margin,
-            bool liquidated
+            uint128 marginMinimum,
+            bool liquidated,
+            uint256 rewards
         )
     {
         // TODO: check re-entrancy view issues
-        // TODO: return min margin requirement?
         Position memory position = _positions[tokenId];
         pool = position.pool;
         positionId = position.id;
-        (zeroForOne, size, debt, margin, liquidated) = getPositionSynced(
-            pool,
-            address(this),
-            positionId
-        );
+        (
+            zeroForOne,
+            size,
+            debt,
+            margin,
+            marginMinimum,
+            liquidated,
+            rewards
+        ) = getPositionSynced(pool, address(this), positionId);
     }
 
     /// @inheritdoc INonfungiblePositionManager

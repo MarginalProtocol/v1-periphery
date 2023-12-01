@@ -16,7 +16,9 @@ interface INonfungiblePositionManager is IERC721 {
     /// @return size The position size on the pool in the margin token
     /// @return debt The position debt owed to the pool in the non-margin token
     /// @return margin The margin backing the position on the pool
+    /// @return marginMinimum The minimum margin requirements necessary to keep position open on pool
     /// @return liquidated Whether the position has been liquidated
+    /// @return rewards The reward available to liquidators when position not safe
     function positions(
         uint256 tokenId
     )
@@ -29,7 +31,9 @@ interface INonfungiblePositionManager is IERC721 {
             uint128 size,
             uint128 debt,
             uint128 margin,
-            bool liquidated
+            uint128 marginMinimum,
+            bool liquidated,
+            uint256 rewards
         );
 
     struct MintParams {

@@ -146,9 +146,11 @@ def test_manager_mint__sets_position_ref(
     zero_for_one,
     sender,
     chain,
+    position_lib,
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
+    reward = pool_initialized_with_liquidity.reward()
     oracle = pool_initialized_with_liquidity.oracle()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
@@ -183,8 +185,13 @@ def test_manager_mint__sets_position_ref(
 
     position_id = state.totalPositions
     owner = manager.address
+
     key = get_position_key(owner, position_id)
     position = pool_initialized_with_liquidity.positions(key)
+
+    margin_min = position_lib.marginMinimum(position, maintenance)
+    rewards = position_lib.liquidationRewards(position.size, reward)
+
     next_id = 1
     assert manager.positions(next_id) == (
         pool_initialized_with_liquidity.address,
@@ -193,7 +200,9 @@ def test_manager_mint__sets_position_ref(
         position.size,
         position.debt0 if zero_for_one else position.debt1,
         position.margin,
+        margin_min,
         position.liquidated,
+        rewards,
     )
 
 

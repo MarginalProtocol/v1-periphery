@@ -9,6 +9,7 @@ import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV
 abstract contract PositionState {
     using PositionLibrary for PositionLibrary.Info;
 
+    uint24 public constant reward = 50000; // 5% of size added to min margin reqs
     uint24 private constant tickCumulativeRateMax = 920; // bound on funding rate of ~10% per funding period
     uint32 private constant secondsAgo = 43200; // 12 hr TWAP for oracle price
     uint32 private constant fundingPeriod = 604800; // 7 day funding period
@@ -83,7 +84,9 @@ abstract contract PositionState {
             uint128 size,
             uint128 debt,
             uint128 margin,
-            bool liquidated
+            uint128 marginMinimum,
+            bool liquidated,
+            uint256 rewards
         )
     {
         bytes32 key = keccak256(abi.encodePacked(recipient, id));
@@ -101,6 +104,8 @@ abstract contract PositionState {
             uint128 _margin,
             uint128 _liquidityLocked
         ) = IMarginalV1Pool(pool).positions(key);
+
+        uint24 maintenance = IMarginalV1Pool(pool).maintenance();
 
         // update for funding with library
         {
@@ -133,7 +138,7 @@ abstract contract PositionState {
             int56 oracleTickCumulativeLast = getOracleSynced(pool);
 
             // sync if not settled or liquidated
-            if (info.size > 0)
+            if (info.size > 0) {
                 info = info.sync(
                     blockTimestampLast,
                     tickCumulativeLast,
@@ -141,6 +146,9 @@ abstract contract PositionState {
                     tickCumulativeRateMax,
                     fundingPeriod
                 );
+                marginMinimum = info.marginMinimum(maintenance);
+                rewards = PositionLibrary.liquidationRewards(info.size, reward);
+            }
 
             zeroForOne = info.zeroForOne;
             size = info.size;

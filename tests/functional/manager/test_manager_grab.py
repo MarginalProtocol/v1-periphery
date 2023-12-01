@@ -101,6 +101,9 @@ def test_manager_grab__liquidates_position(
     token_id = mint_position(zero_for_one)
     adjust_oracle(zero_for_one)  # makes position unsafe
 
+    maintenance = pool_initialized_with_liquidity.maintenance()
+    reward = pool_initialized_with_liquidity.reward()
+
     position_id = pool_initialized_with_liquidity.state().totalPositions - 1
     key = get_position_key(manager.address, position_id)
     position = pool_initialized_with_liquidity.positions(key)
@@ -133,6 +136,9 @@ def test_manager_grab__liquidates_position(
     )
     position = position_lib.liquidate(position)
 
+    margin_min = position_lib.marginMinimum(position, maintenance)
+    rewards = position_lib.liquidationRewards(position.size, reward)
+
     assert pool_initialized_with_liquidity.positions(key) == position
     assert manager.positions(token_id) == (
         pool_initialized_with_liquidity.address,
@@ -141,7 +147,9 @@ def test_manager_grab__liquidates_position(
         position.size,
         position.debt0 if zero_for_one else position.debt1,
         position.margin,
+        margin_min,
         position.liquidated,
+        rewards,
     )
 
 
