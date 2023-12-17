@@ -202,6 +202,7 @@ def test_manager_mint__sets_position_ref(
         position.margin,
         margin_min,
         position.liquidated,
+        True,  # should be safe
         rewards,
     )
 

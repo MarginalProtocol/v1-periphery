@@ -78,6 +78,7 @@ contract NonfungiblePositionManager is
             uint128 margin,
             uint128 marginMinimum,
             bool liquidated,
+            bool safe,
             uint256 rewards
         )
     {
@@ -92,6 +93,7 @@ contract NonfungiblePositionManager is
             margin,
             marginMinimum,
             liquidated,
+            safe,
             rewards
         ) = getPositionSynced(pool, address(this), positionId);
     }
@@ -154,6 +156,7 @@ contract NonfungiblePositionManager is
         );
         amountIn = amount0 > 0 ? amount0 : amount1;
 
+        // @dev ok to call before set position since _safeMint not used so no callback
         _mint(params.recipient, (tokenId = _nextId++));
 
         _positions[tokenId] = Position({

@@ -101,6 +101,10 @@ def test_manager_grab__liquidates_position(
     token_id = mint_position(zero_for_one)
     adjust_oracle(zero_for_one)  # makes position unsafe
 
+    # check manager position unsafe
+    manager_position = manager.positions(token_id)
+    assert manager_position.safe is False
+
     maintenance = pool_initialized_with_liquidity.maintenance()
     reward = pool_initialized_with_liquidity.reward()
 
@@ -149,6 +153,7 @@ def test_manager_grab__liquidates_position(
         position.margin,
         margin_min,
         position.liquidated,
+        False,  # should be unsafe since liquidated
         rewards,
     )
 

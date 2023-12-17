@@ -119,6 +119,7 @@ def test_manager_free__adjusts_position(
         position.margin,
         margin_min,
         position.liquidated,
+        True,  # should be safe
         rewards,
     )
 

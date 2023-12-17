@@ -4,6 +4,8 @@ pragma solidity =0.8.15;
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
 import {Position as PositionLibrary} from "@marginal/v1-core/contracts/libraries/Position.sol";
+import {OracleLibrary} from "@marginal/v1-core/contracts/libraries/OracleLibrary.sol";
+
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
 
 abstract contract PositionState {
@@ -52,20 +54,18 @@ abstract contract PositionState {
         }
     }
 
-    /// @notice Gets external oracle last tick cumulative
+    /// @notice Gets external oracle tick cumulative values for time deltas: [secondsAgo, 0]
     /// @param pool The pool to get external oracle state for
     function getOracleSynced(
         address pool
-    ) internal view returns (int56 oracleTickCumulative) {
+    ) internal view returns (int56[] memory oracleTickCumulatives) {
         address oracle = IMarginalV1Pool(pool).oracle();
 
         // zero seconds ago for oracle tickCumulative
-        uint32[] memory secondsAgos = new uint32[](1);
-        (int56[] memory tickCumulatives, ) = IUniswapV3Pool(oracle).observe(
-            secondsAgos
-        );
+        uint32[] memory secondsAgos = new uint32[](2);
+        secondsAgos[0] = secondsAgo;
 
-        oracleTickCumulative = tickCumulatives[0];
+        (oracleTickCumulatives, ) = IUniswapV3Pool(oracle).observe(secondsAgos);
     }
 
     /// @notice Gets pool position synced for funding updates
@@ -86,6 +86,7 @@ abstract contract PositionState {
             uint128 margin,
             uint128 marginMinimum,
             bool liquidated,
+            bool safe,
             uint256 rewards
         )
     {
@@ -135,17 +136,27 @@ abstract contract PositionState {
 
             ) = getStateSynced(pool);
 
-            int56 oracleTickCumulativeLast = getOracleSynced(pool);
-
             // sync if not settled or liquidated
             if (info.size > 0) {
+                int56[] memory oracleTickCumulativesLast = getOracleSynced(
+                    pool
+                );
+                uint160 oracleSqrtPriceX96 = OracleLibrary.oracleSqrtPriceX96(
+                    OracleLibrary.oracleTickCumulativeDelta(
+                        oracleTickCumulativesLast[0],
+                        oracleTickCumulativesLast[1]
+                    ),
+                    secondsAgo
+                );
+
                 info = info.sync(
                     blockTimestampLast,
                     tickCumulativeLast,
-                    oracleTickCumulativeLast,
+                    oracleTickCumulativesLast[1], // zero seconds ago
                     tickCumulativeRateMax,
                     fundingPeriod
                 );
+                safe = info.safe(oracleSqrtPriceX96, maintenance);
                 marginMinimum = info.marginMinimum(maintenance);
                 rewards = PositionLibrary.liquidationRewards(info.size, reward);
             }
