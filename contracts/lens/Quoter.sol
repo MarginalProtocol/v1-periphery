@@ -8,12 +8,14 @@ import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
 import {LiquidityMath} from "@marginal/v1-core/contracts/libraries/LiquidityMath.sol";
 import {Position} from "@marginal/v1-core/contracts/libraries/Position.sol";
+import {OracleLibrary} from "@marginal/v1-core/contracts/libraries/OracleLibrary.sol";
 import {SwapMath} from "@marginal/v1-core/contracts/libraries/SwapMath.sol";
 import {SqrtPriceMath} from "@marginal/v1-core/contracts/libraries/SqrtPriceMath.sol";
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
 
 import {LiquidityAmounts} from "../libraries/LiquidityAmounts.sol";
 import {PeripheryImmutableState} from "../base/PeripheryImmutableState.sol";
+import {PositionState} from "../base/PositionState.sol";
 import {Path} from "../libraries/Path.sol";
 import {PoolAddress} from "../libraries/PoolAddress.sol";
 import {PositionAmounts} from "../libraries/PositionAmounts.sol";
@@ -22,11 +24,13 @@ import {INonfungiblePositionManager} from "../interfaces/INonfungiblePositionMan
 import {IRouter} from "../interfaces/IRouter.sol";
 import {IQuoter} from "../interfaces/IQuoter.sol";
 
-contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
+contract Quoter is
+    IQuoter,
+    PeripheryImmutableState,
+    PeripheryValidation,
+    PositionState
+{
     using Path for bytes;
-
-    uint24 private constant fee = 1000;
-    uint24 private constant reward = 50000;
 
     constructor(
         address _factory,
@@ -41,6 +45,7 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
     }
 
     /// @inheritdoc IQuoter
+    // TODO: return safe, marginMinimum inclusive of safety check, rewards
     function quoteMint(
         INonfungiblePositionManager.MintParams calldata params
     )
@@ -51,6 +56,7 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
             uint256 size,
             uint256 debt,
             uint256 amountIn,
+            bool safe,
             uint128 liquidityAfter,
             uint160 sqrtPriceX96After
         )
@@ -105,6 +111,8 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
             ? type(uint128).max
             : params.debtMaximum;
 
+        // TODO: amountInMaximum == type(uint256).max if params.amountInMaximum == 0
+
         uint160 sqrtPriceX96Next = SqrtPriceMath.sqrtPriceX96NextOpen(
             liquidity,
             sqrtPriceX96,
@@ -147,7 +155,7 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
         if (size < params.sizeMinimum) revert("Size less than min");
 
         debt = params.zeroForOne ? position.debt0 : position.debt1;
-        if (debt > params.debtMaximum) revert("Debt greater than max");
+        if (debt > debtMaximum) revert("Debt greater than max");
 
         uint256 fees = Position.fees(position.size, fee);
         uint256 rewards = Position.liquidationRewards(position.size, reward);
@@ -165,6 +173,25 @@ contract Quoter is IQuoter, PeripheryImmutableState, PeripheryValidation {
                 !params.zeroForOne ? int256(fees) : int256(0),
                 !params.zeroForOne ? int256(0) : int256(fees)
             );
+
+        // check whether position would be safe after open given twap oracle lag
+        {
+            int56[] memory oracleTickCumulativesLast = getOracleSynced(
+                address(pool)
+            );
+            uint160 oracleSqrtPriceX96 = OracleLibrary.oracleSqrtPriceX96(
+                OracleLibrary.oracleTickCumulativeDelta(
+                    oracleTickCumulativesLast[0],
+                    oracleTickCumulativesLast[1]
+                ),
+                secondsAgo
+            );
+            safe = Position.safe(
+                position,
+                oracleSqrtPriceX96,
+                params.maintenance
+            );
+        }
     }
 
     /// @inheritdoc IQuoter

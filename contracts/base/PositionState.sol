@@ -11,10 +11,11 @@ import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV
 abstract contract PositionState {
     using PositionLibrary for PositionLibrary.Info;
 
-    uint24 public constant reward = 50000; // 5% of size added to min margin reqs
-    uint24 private constant tickCumulativeRateMax = 920; // bound on funding rate of ~10% per funding period
-    uint32 private constant secondsAgo = 43200; // 12 hr TWAP for oracle price
-    uint32 private constant fundingPeriod = 604800; // 7 day funding period
+    uint24 internal constant fee = 1000; // 10 bps on size
+    uint24 internal constant reward = 50000; // 5% of size added to min margin reqs
+    uint24 internal constant tickCumulativeRateMax = 920; // bound on funding rate of ~10% per funding period
+    uint32 internal constant secondsAgo = 43200; // 12 hr TWAP for oracle price
+    uint32 internal constant fundingPeriod = 604800; // 7 day funding period
 
     /// @notice Gets pool state synced for pool oracle updates
     /// @param pool The pool to get state of

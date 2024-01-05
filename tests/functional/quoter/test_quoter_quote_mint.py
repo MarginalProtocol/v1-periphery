@@ -63,6 +63,7 @@ def test_quoter_quote_mint__quotes_mint(
     position = manager.positions(next_id)
     assert result.size == position.size
     assert result.debt == position.debt
+    assert result.safe is True
 
     fees = position_lib.fees(position.size, FEE)
     rewards = position_lib.liquidationRewards(position.size, REWARD)
