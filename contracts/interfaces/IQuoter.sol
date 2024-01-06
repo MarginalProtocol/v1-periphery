@@ -11,6 +11,7 @@ interface IQuoter {
     /// @return size Position size in units of amount1 if zeroForOne == true else units of amount0
     /// @return debt Position debt in units of amount0 if zeroForOne == true else units of amount1
     /// @return amountIn Amount of margin token in required to open position, includes fees and liquidation rewards set aside in pool
+    /// @return safeMarginMinimum The minimum margin requirements necessary to open position on pool while also being safe from liquidation
     /// @return safe Whether the position will be safe given current oracle price averaged over seconds ago
     /// @return liquidityAfter Pool liquidity after mint
     /// @return sqrtPriceX96After Pool sqrt price after mint
@@ -23,6 +24,7 @@ interface IQuoter {
             uint256 size,
             uint256 debt,
             uint256 amountIn,
+            uint256 safeMarginMinimum,
             bool safe,
             uint128 liquidityAfter,
             uint160 sqrtPriceX96After

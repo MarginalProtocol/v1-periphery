@@ -117,7 +117,7 @@ def test_manager_lock__adjusts_position(
         position.size,
         position.debt0 if zero_for_one else position.debt1,
         position.margin,
-        margin_min,
+        margin_min,  # oracle tick == pool tick in conftest.py
         position.liquidated,
         True,  # should be safe
         rewards,

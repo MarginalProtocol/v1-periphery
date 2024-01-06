@@ -56,6 +56,7 @@ contract Quoter is
             uint256 size,
             uint256 debt,
             uint256 amountIn,
+            uint256 safeMarginMinimum,
             bool safe,
             uint128 liquidityAfter,
             uint160 sqrtPriceX96After
@@ -179,17 +180,24 @@ contract Quoter is
             int56[] memory oracleTickCumulativesLast = getOracleSynced(
                 address(pool)
             );
-            uint160 oracleSqrtPriceX96 = OracleLibrary.oracleSqrtPriceX96(
-                OracleLibrary.oracleTickCumulativeDelta(
+            int56 oracleTickCumulativeDelta = OracleLibrary
+                .oracleTickCumulativeDelta(
                     oracleTickCumulativesLast[0],
                     oracleTickCumulativesLast[1]
-                ),
-                secondsAgo
-            );
+                );
+
             safe = Position.safe(
                 position,
-                oracleSqrtPriceX96,
+                OracleLibrary.oracleSqrtPriceX96(
+                    oracleTickCumulativeDelta,
+                    secondsAgo
+                ),
                 params.maintenance
+            );
+            safeMarginMinimum = _safeMarginMinimum(
+                position,
+                params.maintenance,
+                oracleTickCumulativeDelta
             );
         }
     }

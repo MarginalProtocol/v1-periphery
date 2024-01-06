@@ -85,7 +85,7 @@ abstract contract PositionState {
             uint128 size,
             uint128 debt,
             uint128 margin,
-            uint128 marginMinimum,
+            uint128 safeMarginMinimum,
             bool liquidated,
             bool safe,
             uint256 rewards
@@ -142,13 +142,11 @@ abstract contract PositionState {
                 int56[] memory oracleTickCumulativesLast = getOracleSynced(
                     pool
                 );
-                uint160 oracleSqrtPriceX96 = OracleLibrary.oracleSqrtPriceX96(
-                    OracleLibrary.oracleTickCumulativeDelta(
+                int56 oracleTickCumulativeDelta = OracleLibrary
+                    .oracleTickCumulativeDelta(
                         oracleTickCumulativesLast[0],
                         oracleTickCumulativesLast[1]
-                    ),
-                    secondsAgo
-                );
+                    );
 
                 info = info.sync(
                     blockTimestampLast,
@@ -157,9 +155,18 @@ abstract contract PositionState {
                     tickCumulativeRateMax,
                     fundingPeriod
                 );
-                safe = info.safe(oracleSqrtPriceX96, maintenance);
-                marginMinimum = info.marginMinimum(maintenance);
-                rewards = PositionLibrary.liquidationRewards(info.size, reward);
+                safe = info.safe(
+                    OracleLibrary.oracleSqrtPriceX96(
+                        oracleTickCumulativeDelta,
+                        secondsAgo
+                    ),
+                    maintenance
+                );
+                safeMarginMinimum = _safeMarginMinimum(
+                    info,
+                    maintenance,
+                    oracleTickCumulativeDelta
+                );
             }
 
             zeroForOne = info.zeroForOne;
@@ -167,6 +174,37 @@ abstract contract PositionState {
             debt = zeroForOne ? info.debt0 : info.debt1;
             margin = info.margin;
             liquidated = info.liquidated;
+            rewards = PositionLibrary.liquidationRewards(info.size, reward);
         }
+    }
+
+    /// @notice Calculates the minimum margin requirement for the position to remain safe from liquidation
+    /// @dev c_y (safe) >= (1+M) * d_x * max(P, TWAP) - s_y when zeroForOne = true
+    /// or c_x (safe) >= (1+M) * d_y / min(P, TWAP) - s_x when zeroForOne = false
+    /// @param info The position info
+    /// @param maintenance The minimum maintenance margin requirement
+    /// @param oracleTickCumulativeDelta The difference in oracle tick cumulatives averaged over to assess position safety with
+    function _safeMarginMinimum(
+        PositionLibrary.Info memory info,
+        uint24 maintenance,
+        int56 oracleTickCumulativeDelta
+    ) internal pure returns (uint128 safeMarginMinimum) {
+        int24 positionTick = info.tick;
+        int24 oracleTick = int24(
+            oracleTickCumulativeDelta / int56(uint56(secondsAgo))
+        );
+
+        // change to using oracle tick for safe margin minimum calculation if
+        // greater than position tick when zeroForOne = true
+        // or less than position tick when zeroForOne = false
+        if (
+            (info.zeroForOne && oracleTick > positionTick) ||
+            (!info.zeroForOne && oracleTick < positionTick)
+        ) {
+            info.tick = oracleTick;
+        }
+
+        safeMarginMinimum = info.marginMinimum(maintenance);
+        info.tick = positionTick; // in case reuse info, return to actual position tick
     }
 }

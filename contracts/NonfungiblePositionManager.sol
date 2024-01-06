@@ -76,7 +76,7 @@ contract NonfungiblePositionManager is
             uint128 size,
             uint128 debt,
             uint128 margin,
-            uint128 marginMinimum,
+            uint128 safeMarginMinimum,
             bool liquidated,
             bool safe,
             uint256 rewards
@@ -91,7 +91,7 @@ contract NonfungiblePositionManager is
             size,
             debt,
             margin,
-            marginMinimum,
+            safeMarginMinimum,
             liquidated,
             safe,
             rewards
