@@ -19,9 +19,8 @@ import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV
 
 import {IRouter} from "./interfaces/IRouter.sol";
 import {LiquidityManagement} from "./base/LiquidityManagement.sol";
-import {PoolInitializer} from "./base/PoolInitializer.sol";
 import {PeripheryImmutableState} from "./base/PeripheryImmutableState.sol";
-import {PeripheryPaymentsWithFee} from "./base/PeripheryPaymentsWithFee.sol";
+import {PoolInitializer} from "./base/PoolInitializer.sol";
 
 import {CallbackValidation} from "./libraries/CallbackValidation.sol";
 import {LiquidityAmounts} from "./libraries/LiquidityAmounts.sol";
@@ -31,10 +30,9 @@ import {PoolAddress} from "./libraries/PoolAddress.sol";
 contract Router is
     IRouter,
     PeripheryImmutableState,
-    PoolInitializer,
     LiquidityManagement,
+    PoolInitializer,
     PeripheryValidation,
-    PeripheryPaymentsWithFee,
     Multicall,
     SelfPermit
 {

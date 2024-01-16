@@ -59,13 +59,22 @@ interface INonfungiblePositionManager is IERC721 {
     /// @return tokenId The NFT token id associated with the minted position
     /// @return size The position size on the pool in the margin token
     /// @return debt The position debt owed to the pool in the non-margin token
-    /// @return amountIn The amount of margin token in used to open the position, including fees and liquidation rewards set aside in pool
+    /// @return margin The amount of margin token in used to open the position
+    /// @return fees The amount of fees in margin token paid to open the position
+    /// @return rewards The amount of liquidation rewards in native (gas) token escrowed in opened position
     function mint(
         MintParams calldata params
     )
         external
         payable
-        returns (uint256 tokenId, uint256 size, uint256 debt, uint256 amountIn);
+        returns (
+            uint256 tokenId,
+            uint256 size,
+            uint256 debt,
+            uint256 margin,
+            uint256 fees,
+            uint256 rewards
+        );
 
     struct LockParams {
         address token0;
@@ -117,9 +126,13 @@ interface INonfungiblePositionManager is IERC721 {
     /// @param params The parameters necessary for settling the position, encoded as `BurnParams` in calldata
     /// @return amountIn The amount of debt token in used to settle position
     /// @return amountOut The amount of margin token received after settling position
+    /// @return rewards The amount of escrowed liquidation rewards in native (gas) token received after settling position
     function burn(
         BurnParams calldata params
-    ) external payable returns (uint256 amountIn, uint256 amountOut);
+    )
+        external
+        payable
+        returns (uint256 amountIn, uint256 amountOut, uint256 rewards);
 
     struct IgniteParams {
         address token0;
@@ -135,9 +148,10 @@ interface INonfungiblePositionManager is IERC721 {
     /// @notice Burns an existing position, settling on pool via swap through spot
     /// @param params The parameters necessary for settling the position, encoded as `IgniteParams` in calldata
     /// @return amountOut The amount of margin token received after settling position
+    /// @return rewards The amount of escrowed liquidation rewards in native (gas) token received after settling position
     function ignite(
         IgniteParams calldata params
-    ) external payable returns (uint256 amountOut);
+    ) external payable returns (uint256 amountOut, uint256 rewards);
 
     struct GrabParams {
         address token0;
@@ -151,7 +165,7 @@ interface INonfungiblePositionManager is IERC721 {
 
     /// @notice Grabs an existing position, liquidating on pool
     /// @param params The parameters necessary for liquidating a position, encoded as `GrabParams` in calldata
-    /// @return rewards The liquidation rewards received after liquidating the position
+    /// @return rewards The amount of escrowed liquidation rewards in native (gas) token received after liquidating the position
     function grab(
         GrabParams calldata params
     ) external payable returns (uint256 rewards);

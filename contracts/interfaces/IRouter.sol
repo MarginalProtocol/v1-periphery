@@ -2,8 +2,8 @@
 pragma solidity >=0.7.5;
 pragma abicoder v2;
 
-import "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1MintCallback.sol";
-import "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1SwapCallback.sol";
+import {IMarginalV1MintCallback} from "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1MintCallback.sol";
+import {IMarginalV1SwapCallback} from "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1SwapCallback.sol";
 
 interface IRouter is IMarginalV1MintCallback, IMarginalV1SwapCallback {
     event IncreaseLiquidity(

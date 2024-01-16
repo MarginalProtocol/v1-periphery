@@ -5,15 +5,19 @@ import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
+import {TransferHelper} from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
+
 import {IMarginalV1AdjustCallback} from "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1AdjustCallback.sol";
 import {IMarginalV1OpenCallback} from "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1OpenCallback.sol";
 import {IMarginalV1SettleCallback} from "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1SettleCallback.sol";
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
+import {Position as PositionLibrary} from "@marginal/v1-core/contracts/libraries/Position.sol";
 
 import {PeripheryImmutableState} from "./PeripheryImmutableState.sol";
 import {PeripheryPayments} from "./PeripheryPayments.sol";
 import {CallbackValidation} from "../libraries/CallbackValidation.sol";
 import {PoolAddress} from "../libraries/PoolAddress.sol";
+import {PoolConstants} from "../libraries/PoolConstants.sol";
 
 abstract contract PositionManagement is
     IMarginalV1AdjustCallback,
@@ -65,8 +69,9 @@ abstract contract PositionManagement is
             uint256 id,
             uint256 size,
             uint256 debt,
-            uint256 amount0,
-            uint256 amount1
+            uint256 margin,
+            uint256 fees,
+            uint256 rewards
         )
     {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
@@ -77,7 +82,16 @@ abstract contract PositionManagement is
         });
         IMarginalV1Pool pool = getPool(poolKey);
 
-        (id, size, debt, amount0, amount1) = pool.open(
+        rewards = PositionLibrary.liquidationRewards(
+            block.basefee,
+            PoolConstants.blockBaseFeeMin,
+            PoolConstants.gasLiquidate,
+            PoolConstants.rewardPremium
+        ); // deposited for liquidation reward escrow
+
+        uint256 amount0;
+        uint256 amount1;
+        (id, size, debt, amount0, amount1) = pool.open{value: rewards}(
             params.recipient,
             params.zeroForOne,
             params.liquidityDelta,
@@ -93,6 +107,9 @@ abstract contract PositionManagement is
         uint256 amountIn = (!params.zeroForOne) ? amount0 : amount1; // in margin token
         if (amountIn > params.amountInMaximum)
             revert AmountInGreaterThanMax(amountIn);
+
+        margin = params.margin;
+        fees = amountIn - margin;
     }
 
     /// @inheritdoc IMarginalV1OpenCallback
@@ -175,7 +192,11 @@ abstract contract PositionManagement is
     /// @notice Settles a position on pool via external payer of debt
     function settle(
         SettleParams memory params
-    ) internal virtual returns (int256 amount0, int256 amount1) {
+    )
+        internal
+        virtual
+        returns (int256 amount0, int256 amount1, uint256 rewards)
+    {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
@@ -184,7 +205,7 @@ abstract contract PositionManagement is
         });
         IMarginalV1Pool pool = getPool(poolKey);
 
-        (amount0, amount1) = pool.settle(
+        (amount0, amount1, rewards) = pool.settle(
             params.recipient,
             params.id,
             abi.encode(
@@ -206,7 +227,7 @@ abstract contract PositionManagement is
     /// @notice Settles a position by repaying debt with portion of size swapped through spot
     function flash(
         FlashParams memory params
-    ) internal virtual returns (uint256 amountOut) {
+    ) internal virtual returns (uint256 amountOut, uint256 rewards) {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
@@ -216,7 +237,7 @@ abstract contract PositionManagement is
         IMarginalV1Pool pool = getPool(poolKey);
 
         address payer = address(this);
-        (int256 amount0, int256 amount1) = pool.settle(
+        (int256 amount0, int256 amount1, uint256 rewards) = pool.settle(
             payer,
             params.id,
             abi.encode(PositionCallbackData({poolKey: poolKey, payer: payer}))
@@ -318,7 +339,7 @@ abstract contract PositionManagement is
     /// @notice Liquidates a position on pool
     function liquidate(
         LiquidateParams memory params
-    ) internal virtual returns (uint256 rewards0, uint256 rewards1) {
+    ) internal virtual returns (uint256 rewards) {
         PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
             token0: params.token0,
             token1: params.token1,
@@ -327,10 +348,6 @@ abstract contract PositionManagement is
         });
         IMarginalV1Pool pool = getPool(poolKey);
 
-        (rewards0, rewards1) = pool.liquidate(
-            params.recipient,
-            params.owner,
-            params.id
-        );
+        rewards = pool.liquidate(params.recipient, params.owner, params.id);
     }
 }

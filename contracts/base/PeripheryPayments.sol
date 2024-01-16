@@ -3,11 +3,11 @@ pragma solidity >=0.7.5;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {IPeripheryPayments} from "@uniswap/v3-periphery/contracts/interfaces/IPeripheryPayments.sol";
 import {IWETH9} from "@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol";
-
 import {TransferHelper} from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 
+import {PoolAddress} from "../libraries/PoolAddress.sol";
+import {IPeripheryPayments} from "../interfaces/IPeripheryPayments.sol";
 import {PeripheryImmutableState} from "./PeripheryImmutableState.sol";
 
 abstract contract PeripheryPayments is
@@ -15,7 +15,11 @@ abstract contract PeripheryPayments is
     PeripheryImmutableState
 {
     receive() external payable {
-        require(msg.sender == WETH9, "Not WETH9");
+        // WETH9 if unwrap, pool when receiving escrowed liquidation rewards
+        require(
+            msg.sender == WETH9 || PoolAddress.isPool(factory, msg.sender),
+            "Not WETH9 or pool"
+        );
     }
 
     /// @inheritdoc IPeripheryPayments
@@ -47,7 +51,7 @@ abstract contract PeripheryPayments is
     }
 
     /// @inheritdoc IPeripheryPayments
-    function refundETH() external payable override {
+    function refundETH() public payable override {
         if (address(this).balance > 0)
             TransferHelper.safeTransferETH(msg.sender, address(this).balance);
     }

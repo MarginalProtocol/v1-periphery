@@ -16,45 +16,6 @@ abstract contract PoolInitializer is IPoolInitializer, PeripheryImmutableState {
     error InvalidOracle();
 
     /// @inheritdoc IPoolInitializer
-    function createAndInitializePoolIfNecessary(
-        address token0,
-        address token1,
-        uint24 maintenance,
-        uint24 uniswapV3Fee,
-        uint160 sqrtPriceX96
-    ) external payable override returns (address pool) {
-        require(token0 < token1);
-        address oracle = IUniswapV3Factory(uniswapV3Factory).getPool(
-            token0,
-            token1,
-            uniswapV3Fee
-        );
-        if (oracle == address(0)) revert InvalidOracle();
-
-        pool = IMarginalV1Factory(factory).getPool(
-            token0,
-            token1,
-            maintenance,
-            oracle
-        );
-        if (pool == address(0)) {
-            pool = IMarginalV1Factory(factory).createPool(
-                token0,
-                token1,
-                maintenance,
-                uniswapV3Fee
-            );
-            IMarginalV1Pool(pool).initialize(sqrtPriceX96);
-        } else {
-            (, uint160 sqrtPriceX96Existing, , , , , , ) = IMarginalV1Pool(pool)
-                .state();
-            if (sqrtPriceX96Existing == 0) {
-                IMarginalV1Pool(pool).initialize(sqrtPriceX96);
-            }
-        }
-    }
-
-    /// @inheritdoc IPoolInitializer
     function initializeOracleIfNecessary(
         address token0,
         address token1,

@@ -7,7 +7,7 @@ import {PeripheryValidation} from "@uniswap/v3-periphery/contracts/base/Peripher
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
 import {LiquidityMath} from "@marginal/v1-core/contracts/libraries/LiquidityMath.sol";
-import {Position} from "@marginal/v1-core/contracts/libraries/Position.sol";
+import {Position as PositionLibrary} from "@marginal/v1-core/contracts/libraries/Position.sol";
 import {OracleLibrary} from "@marginal/v1-core/contracts/libraries/OracleLibrary.sol";
 import {SwapMath} from "@marginal/v1-core/contracts/libraries/SwapMath.sol";
 import {SqrtPriceMath} from "@marginal/v1-core/contracts/libraries/SqrtPriceMath.sol";
@@ -18,6 +18,7 @@ import {PeripheryImmutableState} from "../base/PeripheryImmutableState.sol";
 import {PositionState} from "../base/PositionState.sol";
 import {Path} from "../libraries/Path.sol";
 import {PoolAddress} from "../libraries/PoolAddress.sol";
+import {PoolConstants} from "../libraries/PoolConstants.sol";
 import {PositionAmounts} from "../libraries/PositionAmounts.sol";
 
 import {INonfungiblePositionManager} from "../interfaces/INonfungiblePositionManager.sol";
@@ -45,7 +46,6 @@ contract Quoter is
     }
 
     /// @inheritdoc IQuoter
-    // TODO: return safe, marginMinimum inclusive of safety check, rewards
     function quoteMint(
         INonfungiblePositionManager.MintParams calldata params
     )
@@ -55,8 +55,10 @@ contract Quoter is
         returns (
             uint256 size,
             uint256 debt,
-            uint256 amountIn,
+            uint256 margin,
             uint256 safeMarginMinimum,
+            uint256 fees,
+            uint256 rewards,
             bool safe,
             uint128 liquidityAfter,
             uint160 sqrtPriceX96After
@@ -72,10 +74,10 @@ contract Quoter is
         );
 
         (
-            uint128 liquidity,
             uint160 sqrtPriceX96,
-            int24 tick,
             ,
+            uint128 liquidity,
+            int24 tick,
             ,
             ,
             uint8 feeProtocol,
@@ -112,7 +114,9 @@ contract Quoter is
             ? type(uint128).max
             : params.debtMaximum;
 
-        // TODO: amountInMaximum == type(uint256).max if params.amountInMaximum == 0
+        uint256 amountInMaximum = params.amountInMaximum == 0
+            ? type(uint256).max
+            : params.amountInMaximum;
 
         uint160 sqrtPriceX96Next = SqrtPriceMath.sqrtPriceX96NextOpen(
             liquidity,
@@ -128,7 +132,7 @@ contract Quoter is
         ) revert("sqrtPriceX96Next exceeds limit");
 
         // @dev ignore tick cumulatives and timestamps on position assemble
-        Position.Info memory position = Position.assemble(
+        PositionLibrary.Info memory position = PositionLibrary.assemble(
             liquidity,
             sqrtPriceX96,
             sqrtPriceX96Next,
@@ -144,7 +148,7 @@ contract Quoter is
             (params.zeroForOne ? position.debt0 == 0 : position.debt1 == 0)
         ) revert("Invalid position");
 
-        uint128 marginMinimum = Position.marginMinimum(
+        uint128 marginMinimum = PositionLibrary.marginMinimum(
             position,
             params.maintenance
         );
@@ -158,21 +162,28 @@ contract Quoter is
         debt = params.zeroForOne ? position.debt0 : position.debt1;
         if (debt > debtMaximum) revert("Debt greater than max");
 
-        uint256 fees = Position.fees(position.size, fee);
-        uint256 rewards = Position.liquidationRewards(position.size, reward);
-        amountIn = params.margin + fees + rewards;
-        if (amountIn > params.amountInMaximum)
-            revert("amountIn greater than max");
+        margin = params.margin;
+        fees = PositionLibrary.fees(position.size, PoolConstants.fee);
+        rewards = PositionLibrary.liquidationRewards(
+            block.basefee,
+            PoolConstants.blockBaseFeeMin,
+            PoolConstants.gasLiquidate,
+            PoolConstants.rewardPremium
+        );
 
-        // account for protocol fees *after* since taken from amountIn once transferred to pool
-        if (feeProtocol > 0) fees -= uint256(fees / feeProtocol);
+        uint256 amountIn = margin + fees;
+        if (amountIn > amountInMaximum) revert("amountIn greater than max");
+
+        // account for protocol fees *after* since taken from fees once transferred to pool
+        uint256 _fees = fees;
+        if (feeProtocol > 0) _fees -= uint256(_fees / feeProtocol);
 
         (liquidityAfter, sqrtPriceX96After) = LiquidityMath
             .liquiditySqrtPriceX96Next(
                 liquidity - liquidityDelta,
                 sqrtPriceX96Next,
-                !params.zeroForOne ? int256(fees) : int256(0),
-                !params.zeroForOne ? int256(0) : int256(fees)
+                !params.zeroForOne ? int256(_fees) : int256(0),
+                !params.zeroForOne ? int256(0) : int256(_fees)
             );
 
         // check whether position would be safe after open given twap oracle lag
@@ -186,11 +197,11 @@ contract Quoter is
                     oracleTickCumulativesLast[1]
                 );
 
-            safe = Position.safe(
+            safe = PositionLibrary.safe(
                 position,
                 OracleLibrary.oracleSqrtPriceX96(
                     oracleTickCumulativeDelta,
-                    secondsAgo
+                    PoolConstants.secondsAgo
                 ),
                 params.maintenance
             );
@@ -226,9 +237,9 @@ contract Quoter is
         );
 
         (
-            uint128 liquidity,
             uint160 sqrtPriceX96,
             ,
+            uint128 liquidity,
             ,
             ,
             ,
@@ -259,7 +270,13 @@ contract Quoter is
         ) revert("Invalid sqrtPriceLimitX96");
 
         int256 amountSpecifiedLessFee = amountSpecified -
-            int256(SwapMath.swapFees(uint256(amountSpecified), fee));
+            int256(
+                SwapMath.swapFees(
+                    uint256(amountSpecified),
+                    PoolConstants.fee,
+                    false
+                )
+            );
         uint160 sqrtPriceX96Next = SqrtPriceMath.sqrtPriceX96NextSwap(
             liquidity,
             sqrtPriceX96,
@@ -377,9 +394,9 @@ contract Quoter is
         );
 
         (
-            uint128 liquidity,
             uint160 sqrtPriceX96,
             ,
+            uint128 liquidity,
             ,
             ,
             ,
@@ -432,7 +449,11 @@ contract Quoter is
 
         // account for protocol fees if turned on
         uint256 amountInLessFee = uint256(zeroForOne ? amount0 : amount1);
-        uint256 fees = SwapMath.swapFees(amountInLessFee, fee);
+        uint256 fees = SwapMath.swapFees(
+            amountInLessFee,
+            PoolConstants.fee,
+            true
+        );
         amountIn = amountInLessFee + fees; // amount in required of swapper to send
         if (amountIn > params.amountInMaximum) revert("Too much requested");
 
@@ -528,10 +549,11 @@ contract Quoter is
             })
         );
 
+        // TODO: account for initialize on first mint
         (
-            uint128 liquidity,
             uint160 sqrtPriceX96,
             ,
+            uint128 liquidity,
             ,
             ,
             ,
@@ -595,9 +617,9 @@ contract Quoter is
         );
 
         (
-            uint128 liquidity,
             uint160 sqrtPriceX96,
             ,
+            uint128 liquidity,
             ,
             ,
             ,

@@ -5,17 +5,12 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Po
 
 import {Position as PositionLibrary} from "@marginal/v1-core/contracts/libraries/Position.sol";
 import {OracleLibrary} from "@marginal/v1-core/contracts/libraries/OracleLibrary.sol";
-
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
+
+import {PoolConstants} from "../libraries/PoolConstants.sol";
 
 abstract contract PositionState {
     using PositionLibrary for PositionLibrary.Info;
-
-    uint24 internal constant fee = 1000; // 10 bps on size
-    uint24 internal constant reward = 50000; // 5% of size added to min margin reqs
-    uint24 internal constant tickCumulativeRateMax = 920; // bound on funding rate of ~10% per funding period
-    uint32 internal constant secondsAgo = 43200; // 12 hr TWAP for oracle price
-    uint32 internal constant fundingPeriod = 604800; // 7 day funding period
 
     /// @notice Gets pool state synced for pool oracle updates
     /// @param pool The pool to get state of
@@ -25,23 +20,23 @@ abstract contract PositionState {
         internal
         view
         returns (
-            uint128 liquidity,
             uint160 sqrtPriceX96,
+            uint96 totalPositions,
+            uint128 liquidity,
             int24 tick,
             uint32 blockTimestamp,
             int56 tickCumulative,
-            uint96 totalPositions,
             uint8 feeProtocol,
             bool initialized
         )
     {
         (
-            liquidity,
             sqrtPriceX96,
+            totalPositions,
+            liquidity,
             tick,
             blockTimestamp,
             tickCumulative,
-            totalPositions,
             feeProtocol,
             initialized
         ) = IMarginalV1Pool(pool).state();
@@ -64,7 +59,7 @@ abstract contract PositionState {
 
         // zero seconds ago for oracle tickCumulative
         uint32[] memory secondsAgos = new uint32[](2);
-        secondsAgos[0] = secondsAgo;
+        secondsAgos[0] = PoolConstants.secondsAgo;
 
         (oracleTickCumulatives, ) = IUniswapV3Pool(oracle).observe(secondsAgos);
     }
@@ -92,19 +87,26 @@ abstract contract PositionState {
         )
     {
         bytes32 key = keccak256(abi.encodePacked(recipient, id));
+
+        uint128 _debt0;
+        uint128 _debt1;
+        int24 _tick;
+        uint32 _blockTimestamp;
+        int56 _tickCumulativeDelta;
         (
-            uint128 _size,
-            uint128 _debt0,
-            uint128 _debt1,
-            uint128 _insurance0,
-            uint128 _insurance1,
-            bool _zeroForOne,
-            bool _liquidated,
-            int24 _tick,
-            uint32 _blockTimestamp,
-            int56 _tickCumulativeDelta,
-            uint128 _margin,
-            uint128 _liquidityLocked
+            size,
+            _debt0,
+            _debt1,
+            ,
+            ,
+            zeroForOne,
+            liquidated,
+            _tick,
+            _blockTimestamp,
+            _tickCumulativeDelta,
+            margin,
+            ,
+            rewards
         ) = IMarginalV1Pool(pool).positions(key);
 
         uint24 maintenance = IMarginalV1Pool(pool).maintenance();
@@ -112,33 +114,34 @@ abstract contract PositionState {
         // update for funding with library
         {
             PositionLibrary.Info memory info = PositionLibrary.Info({
-                size: _size,
+                size: size,
                 debt0: _debt0,
                 debt1: _debt1,
-                insurance0: _insurance0,
-                insurance1: _insurance1,
-                zeroForOne: _zeroForOne,
-                liquidated: _liquidated,
+                insurance0: 0, // @dev irrelevant for sync
+                insurance1: 0,
+                zeroForOne: zeroForOne,
+                liquidated: liquidated,
                 tick: _tick,
                 blockTimestamp: _blockTimestamp,
                 tickCumulativeDelta: _tickCumulativeDelta,
-                margin: _margin,
-                liquidityLocked: _liquidityLocked
+                margin: margin,
+                liquidityLocked: 0, // @dev irrelevant for sync
+                rewards: rewards
             });
-
-            (
-                ,
-                ,
-                ,
-                uint32 blockTimestampLast,
-                int56 tickCumulativeLast,
-                ,
-                ,
-
-            ) = getStateSynced(pool);
 
             // sync if not settled or liquidated
             if (info.size > 0) {
+                (
+                    ,
+                    ,
+                    ,
+                    ,
+                    uint32 blockTimestampLast,
+                    int56 tickCumulativeLast,
+                    ,
+
+                ) = getStateSynced(pool);
+
                 int56[] memory oracleTickCumulativesLast = getOracleSynced(
                     pool
                 );
@@ -148,17 +151,17 @@ abstract contract PositionState {
                         oracleTickCumulativesLast[1]
                     );
 
-                info = info.sync(
+                info.sync(
                     blockTimestampLast,
                     tickCumulativeLast,
                     oracleTickCumulativesLast[1], // zero seconds ago
-                    tickCumulativeRateMax,
-                    fundingPeriod
+                    PoolConstants.tickCumulativeRateMax,
+                    PoolConstants.fundingPeriod
                 );
                 safe = info.safe(
                     OracleLibrary.oracleSqrtPriceX96(
                         oracleTickCumulativeDelta,
-                        secondsAgo
+                        PoolConstants.secondsAgo
                     ),
                     maintenance
                 );
@@ -169,12 +172,7 @@ abstract contract PositionState {
                 );
             }
 
-            zeroForOne = info.zeroForOne;
-            size = info.size;
             debt = zeroForOne ? info.debt0 : info.debt1;
-            margin = info.margin;
-            liquidated = info.liquidated;
-            rewards = PositionLibrary.liquidationRewards(info.size, reward);
         }
     }
 
@@ -191,7 +189,7 @@ abstract contract PositionState {
     ) internal pure returns (uint128 safeMarginMinimum) {
         int24 positionTick = info.tick;
         int24 oracleTick = int24(
-            oracleTickCumulativeDelta / int56(uint56(secondsAgo))
+            oracleTickCumulativeDelta / int56(uint56(PoolConstants.secondsAgo))
         );
 
         // change to using oracle tick for safe margin minimum calculation if

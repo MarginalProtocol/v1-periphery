@@ -54,4 +54,14 @@ library PoolAddress {
         );
         if (pool == address(0)) revert PoolInactive();
     }
+
+    /// @notice Checks factory for whether `pool` is a valid pool
+    /// @param factory The factory contract address
+    /// @param pool The contract address to check whether is a pool
+    function isPool(
+        address factory,
+        address pool
+    ) internal view returns (bool) {
+        return IMarginalV1Factory(factory).isPool(pool);
+    }
 }

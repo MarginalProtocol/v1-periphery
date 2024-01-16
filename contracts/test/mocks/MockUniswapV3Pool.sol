@@ -155,7 +155,7 @@ contract MockUniswapV3Pool {
         bool exactInput = amountSpecified > 0;
         int256 amountSpecifiedLessFee = exactInput
             ? amountSpecified -
-                int256(SwapMath.swapFees(uint256(amountSpecified), fee))
+                int256(SwapMath.swapFees(uint256(amountSpecified), fee, false))
             : amountSpecified;
 
         uint160 sqrtPriceX96Next = SqrtPriceMath.sqrtPriceX96NextSwap(
@@ -186,7 +186,7 @@ contract MockUniswapV3Pool {
                 );
             uint256 fees1 = exactInput
                 ? uint256(amountSpecified) - uint256(amount1)
-                : SwapMath.swapFees(uint256(amount1), fee);
+                : SwapMath.swapFees(uint256(amount1), fee, true);
             amount1 += int256(fees1);
 
             uint256 balance1Before = IERC20(token1).balanceOf(address(this));
@@ -226,7 +226,7 @@ contract MockUniswapV3Pool {
                 );
             uint256 fees0 = exactInput
                 ? uint256(amountSpecified) - uint256(amount0)
-                : SwapMath.swapFees(uint256(amount0), fee);
+                : SwapMath.swapFees(uint256(amount0), fee, true);
             amount0 += int256(fees0);
 
             uint256 balance0Before = IERC20(token0).balanceOf(address(this));

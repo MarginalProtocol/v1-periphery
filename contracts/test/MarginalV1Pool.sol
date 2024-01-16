@@ -23,7 +23,6 @@ import {IMarginalV1SettleCallback} from "@marginal/v1-core/contracts/interfaces/
 import {IMarginalV1SwapCallback} from "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1SwapCallback.sol";
 
 import {IMarginalV1Factory} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Factory.sol";
-import {IMarginalV1PoolDeployer} from "@marginal/v1-core/contracts/interfaces/IMarginalV1PoolDeployer.sol";
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
 
 contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
@@ -31,44 +30,64 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
     using Position for Position.Info;
     using SafeCast for uint256;
 
+    /// @inheritdoc IMarginalV1Pool
     address public immutable factory;
+    /// @inheritdoc IMarginalV1Pool
     address public immutable oracle;
 
+    /// @inheritdoc IMarginalV1Pool
     address public immutable token0;
+    /// @inheritdoc IMarginalV1Pool
     address public immutable token1;
+    /// @inheritdoc IMarginalV1Pool
     uint24 public immutable maintenance;
 
+    /// @inheritdoc IMarginalV1Pool
     uint24 public constant fee = 1000; // 10 bps across all pools
-    uint24 public constant reward = 50000; // 5% of size added to min margin reqs
+    /// @inheritdoc IMarginalV1Pool
+    uint24 public constant rewardPremium = 2000000; // 2x base fee as liquidation rewards
+    /// @inheritdoc IMarginalV1Pool
     uint24 public constant tickCumulativeRateMax = 920; // bound on funding rate of ~10% per funding period
 
+    /// @inheritdoc IMarginalV1Pool
     uint32 public constant secondsAgo = 43200; // 12 hr TWAP for oracle price
+    /// @inheritdoc IMarginalV1Pool
     uint32 public constant fundingPeriod = 604800; // 7 day funding period
 
-    // @dev Pool state represented in (L, sqrtP) space
+    // @dev varies for different chains
+    uint256 internal constant blockBaseFeeMin = 40e9; // min base fee for liquidation rewards
+    uint256 internal constant gasLiquidate = 150000; // gas required to call liquidate
+
+    uint128 internal constant MINIMUM_LIQUIDITY = 10000; // liquidity locked on initial mint always available for swaps
+    uint128 internal constant MINIMUM_SIZE = 10000; // minimum position size, debt, insurance amounts to prevent dust sizes
+
     struct State {
-        uint128 liquidity;
         uint160 sqrtPriceX96;
+        uint96 totalPositions; // > ~ 2e20 years at max per block to fill on mainnet
+        uint128 liquidity;
         int24 tick;
         uint32 blockTimestamp;
         int56 tickCumulative;
-        uint96 totalPositions; // > ~ 2e20 years at max per block to fill on mainnet
         uint8 feeProtocol;
         bool initialized;
     }
+    /// @inheritdoc IMarginalV1Pool
     State public state;
 
+    /// @inheritdoc IMarginalV1Pool
     uint128 public liquidityLocked;
 
     struct ProtocolFees {
         uint128 token0;
         uint128 token1;
     }
+    /// @inheritdoc IMarginalV1Pool
     ProtocolFees public protocolFees;
 
+    /// @inheritdoc IMarginalV1Pool
     mapping(bytes32 => Position.Info) public positions;
 
-    uint256 private unlocked = 1; // uses OZ convention of 1 for false and 2 for true
+    uint256 private unlocked = 2; // uses OZ convention of 1 for false and 2 for true
     modifier lock() {
         if (unlocked == 1) revert Locked();
         unlocked = 1;
@@ -104,7 +123,8 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         uint128 liquidityAfter,
         uint160 sqrtPriceX96After,
         int256 amount0,
-        int256 amount1
+        int256 amount1,
+        uint256 rewards
     );
     event Liquidate(
         address indexed owner,
@@ -112,8 +132,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         address recipient,
         uint128 liquidityAfter,
         uint160 sqrtPriceX96After,
-        uint256 rewards0,
-        uint256 rewards1
+        uint256 rewards
     );
     event Swap(
         address indexed sender,
@@ -148,17 +167,16 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
 
     error Locked();
     error Unauthorized();
-    error Initialized();
     error InvalidLiquidityDelta();
     error InvalidSqrtPriceLimitX96();
     error SqrtPriceX96ExceedsLimit();
     error MarginLessThanMin();
+    error RewardsLessThanMin();
     error Amount0LessThanMin();
     error Amount1LessThanMin();
     error InvalidPosition();
     error PositionSafe();
     error InvalidAmountSpecified();
-    error InvalidShares();
     error InvalidFeeProtocol();
 
     constructor(
@@ -173,28 +191,36 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         token1 = _token1;
         maintenance = _maintenance;
         oracle = _oracle;
-
-        // reverts if not enough historical observations
-        // TODO: enough of a check on hist obs?
-        uint32[] memory secondsAgos = new uint32[](2);
-        secondsAgos[0] = secondsAgo;
-        oracleTickCumulatives(secondsAgos);
     }
 
-    function initialize(uint160 _sqrtPriceX96) external {
-        if (state.sqrtPriceX96 > 0) revert Initialized();
+    function initialize() private {
+        // reverts if not enough historical observations
+        uint32[] memory secondsAgos = new uint32[](2);
+        secondsAgos[0] = secondsAgo;
+        int56[] memory oracleTickCumulativesLast = oracleTickCumulatives(
+            secondsAgos
+        );
+
+        // use oracle price to initialize
+        uint160 _sqrtPriceX96 = OracleLibrary.oracleSqrtPriceX96(
+            OracleLibrary.oracleTickCumulativeDelta(
+                oracleTickCumulativesLast[0],
+                oracleTickCumulativesLast[1]
+            ),
+            secondsAgo
+        );
         int24 tick = TickMath.getTickAtSqrtRatio(_sqrtPriceX96);
+
         state = State({
-            liquidity: 0,
             sqrtPriceX96: _sqrtPriceX96,
+            totalPositions: 0,
+            liquidity: 0,
             tick: tick,
             blockTimestamp: _blockTimestamp(),
             tickCumulative: 0,
-            totalPositions: 0,
             feeProtocol: 0,
             initialized: true
         });
-        unlocked = 2;
         emit Initialize(_sqrtPriceX96, tick);
     }
 
@@ -213,7 +239,6 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
     function oracleTickCumulatives(
         uint32[] memory secondsAgos
     ) private view returns (int56[] memory) {
-        // TODO: oracle buffers?
         (int56[] memory tickCumulatives, ) = IUniswapV3Pool(oracle).observe(
             secondsAgos
         );
@@ -223,16 +248,16 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
     function stateSynced() private view returns (State memory) {
         State memory _state = state;
         // oracle update
-        // TODO: test overflow
         unchecked {
-            _state.tickCumulative +=
-                int56(_state.tick) *
-                int56(uint56(_blockTimestamp() - _state.blockTimestamp)); // overflow desired
+            uint32 delta = _blockTimestamp() - _state.blockTimestamp;
+            if (delta == 0) return _state; // early exit if nothing to update
+            _state.tickCumulative += int56(_state.tick) * int56(uint56(delta)); // overflow desired
             _state.blockTimestamp = _blockTimestamp();
         }
         return _state;
     }
 
+    /// @inheritdoc IMarginalV1Pool
     function open(
         address recipient,
         bool zeroForOne,
@@ -242,6 +267,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         bytes calldata data
     )
         external
+        payable
         lock
         returns (
             uint256 id,
@@ -252,8 +278,10 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         )
     {
         State memory _state = stateSynced();
-        if (liquidityDelta == 0 || liquidityDelta >= _state.liquidity)
-            revert InvalidLiquidityDelta(); // TODO: test liquidityDelta == 0
+        if (
+            liquidityDelta == 0 ||
+            liquidityDelta + MINIMUM_LIQUIDITY >= _state.liquidity
+        ) revert InvalidLiquidityDelta();
         if (
             zeroForOne
                 ? !(sqrtPriceLimitX96 < _state.sqrtPriceX96 &&
@@ -290,14 +318,26 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             oracleTickCumulative
         );
         if (
-            position.size == 0 ||
-            (zeroForOne ? position.debt0 == 0 : position.debt1 == 0)
-        ) revert InvalidPosition(); // TODO: test
+            position.size < MINIMUM_SIZE ||
+            position.debt0 < MINIMUM_SIZE ||
+            position.debt1 < MINIMUM_SIZE ||
+            position.insurance0 < MINIMUM_SIZE ||
+            position.insurance1 < MINIMUM_SIZE
+        ) revert InvalidPosition();
 
         uint128 marginMinimum = position.marginMinimum(maintenance);
         if (marginMinimum == 0 || margin < marginMinimum)
-            revert MarginLessThanMin(); // TODO: test marginMinimum == 0
+            revert MarginLessThanMin();
         position.margin = margin;
+
+        uint256 rewardsMinimum = Position.liquidationRewards(
+            block.basefee,
+            blockBaseFeeMin,
+            gasLiquidate,
+            rewardPremium
+        );
+        if (msg.value < rewardsMinimum) revert RewardsLessThanMin();
+        position.rewards = msg.value;
 
         _state.liquidity -= liquidityDelta;
         _state.sqrtPriceX96 = sqrtPriceX96Next;
@@ -308,11 +348,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         if (!zeroForOne) {
             // long token0 (out) relative to token1 (in); margin in token0
             uint256 fees0 = Position.fees(position.size, fee);
-            uint256 rewards0 = Position.liquidationRewards(
-                position.size,
-                reward
-            );
-            amount0 = uint256(margin) + fees0 + rewards0; // TODO: check fees, rewards > 0?
+            amount0 = uint256(margin) + fees0;
 
             uint256 balance0Before = balance0();
             IMarginalV1OpenCallback(msg.sender).marginalV1OpenCallback(
@@ -344,11 +380,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         } else {
             // long token1 (out) relative to token0 (in); margin in token1
             uint256 fees1 = Position.fees(position.size, fee);
-            uint256 rewards1 = Position.liquidationRewards(
-                position.size,
-                reward
-            );
-            amount1 = uint256(margin) + fees1 + rewards1; // TODO: check fees, rewards > 0?
+            amount1 = uint256(margin) + fees1;
 
             uint256 balance1Before = balance1();
             IMarginalV1OpenCallback(msg.sender).marginalV1OpenCallback(
@@ -399,6 +431,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         );
     }
 
+    /// @inheritdoc IMarginalV1Pool
     function adjust(
         address recipient,
         uint96 id,
@@ -422,16 +455,15 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         );
         uint128 marginMinimum = position.marginMinimum(maintenance);
         if (
-            !(marginDelta > 0 ||
-                uint256(position.margin) >=
-                uint256(uint128(-marginDelta)) + uint256(marginMinimum))
+            int256(uint256(position.margin)) + int256(marginDelta) <
+            int256(uint256(marginMinimum))
         ) revert MarginLessThanMin();
 
         // flash margin out then callback for margin in
         if (!position.zeroForOne) {
             margin0 = uint256(
                 int256(uint256(position.margin)) + int256(marginDelta)
-            );
+            ); // position margin after
             TransferHelper.safeTransfer(token0, recipient, position.margin);
 
             uint256 balance0Before = balance0();
@@ -447,7 +479,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         } else {
             margin1 = uint256(
                 int256(uint256(position.margin)) + int256(marginDelta)
-            );
+            ); // position margin after
             TransferHelper.safeTransfer(token1, recipient, position.margin);
 
             uint256 balance1Before = balance1();
@@ -462,7 +494,10 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             position.margin = margin1.toUint128();
         }
 
-        positions.set(msg.sender, id, position);
+        // don't update position stored debts for funding to avoid short circuiting issues
+        Position.Info memory _position = positions.get(msg.sender, id);
+        _position.margin = position.margin;
+        positions.set(msg.sender, id, _position);
 
         // update pool state to latest
         state = _state;
@@ -470,11 +505,12 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         emit Adjust(msg.sender, uint256(id), recipient, position.margin);
     }
 
+    /// @inheritdoc IMarginalV1Pool
     function settle(
         address recipient,
         uint96 id,
         bytes calldata data
-    ) external lock returns (int256 amount0, int256 amount1) {
+    ) external lock returns (int256 amount0, int256 amount1, uint256 rewards) {
         State memory _state = stateSynced();
         Position.Info memory position = positions.get(msg.sender, id);
         if (position.size == 0) revert InvalidPosition();
@@ -496,14 +532,13 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             .amountsLocked();
 
         // flash size + margin + rewards out then callback for debt owed in
+        rewards = position.rewards;
+        TransferHelper.safeTransferETH(recipient, rewards); // ok given lock
+
         if (!position.zeroForOne) {
-            uint256 rewards0 = Position.liquidationRewards(
-                position.size,
-                reward
-            );
             amount0 = -int256(
-                uint256(position.size) + uint256(position.margin) + rewards0
-            ); // size + margin + rewards out
+                uint256(position.size) + uint256(position.margin)
+            ); // size + margin out
             amount1 = int256(uint256(position.debt1)); // debt in
 
             if (amount0 < 0)
@@ -537,15 +572,10 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             if (balance1Before + uint256(amount1) > balance1())
                 revert Amount1LessThanMin();
         } else {
-            uint256 rewards1 = Position.liquidationRewards(
-                position.size,
-                reward
-            );
-
             amount0 = int256(uint256(position.debt0)); // debt in
             amount1 = -int256(
-                uint256(position.size) + uint256(position.margin) + rewards1
-            ); // size + margin + rewards out
+                uint256(position.size) + uint256(position.margin)
+            ); // size + margin out
 
             if (amount1 < 0)
                 TransferHelper.safeTransfer(
@@ -591,15 +621,17 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             _state.liquidity,
             _state.sqrtPriceX96,
             amount0,
-            amount1
+            amount1,
+            rewards
         );
     }
 
+    /// @inheritdoc IMarginalV1Pool
     function liquidate(
         address recipient,
         address owner,
         uint96 id
-    ) external lock returns (uint256 rewards0, uint256 rewards1) {
+    ) external lock returns (uint256 rewards) {
         State memory _state = stateSynced();
         Position.Info memory position = positions.get(owner, id);
         if (position.size == 0) revert InvalidPosition();
@@ -633,13 +665,6 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         liquidityLocked -= position.liquidityLocked;
         (uint256 amount0, uint256 amount1) = position.amountsLocked();
 
-        if (!position.zeroForOne) {
-            rewards0 = Position.liquidationRewards(position.size, reward);
-        } else {
-            rewards1 = Position.liquidationRewards(position.size, reward);
-        }
-
-        // TODO: fix for edge of margin => infty as overflows?
         (_state.liquidity, _state.sqrtPriceX96) = LiquidityMath
             .liquiditySqrtPriceX96Next(
                 _state.liquidity,
@@ -649,10 +674,8 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             );
         _state.tick = TickMath.getTickAtSqrtRatio(_state.sqrtPriceX96);
 
-        if (rewards0 > 0)
-            TransferHelper.safeTransfer(token0, recipient, rewards0);
-        if (rewards1 > 0)
-            TransferHelper.safeTransfer(token1, recipient, rewards1);
+        rewards = position.rewards;
+        TransferHelper.safeTransferETH(recipient, rewards); // ok given lock
 
         positions.set(owner, id, position.liquidate());
 
@@ -665,11 +688,11 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             recipient,
             _state.liquidity,
             _state.sqrtPriceX96,
-            rewards0,
-            rewards1
+            rewards
         );
     }
 
+    /// @inheritdoc IMarginalV1Pool
     function swap(
         address recipient,
         bool zeroForOne,
@@ -691,7 +714,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         bool exactInput = amountSpecified > 0;
         int256 amountSpecifiedLessFee = exactInput
             ? amountSpecified -
-                int256(SwapMath.swapFees(uint256(amountSpecified), fee))
+                int256(SwapMath.swapFees(uint256(amountSpecified), fee, false))
             : amountSpecified;
 
         uint160 sqrtPriceX96Next = SqrtPriceMath.sqrtPriceX96NextSwap(
@@ -715,7 +738,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
 
         // optimistic amount out with callback for amount in
         if (!zeroForOne) {
-            amount0 = !exactInput ? amountSpecified : amount0; // in case of rounding issues TODO: test
+            amount0 = !exactInput ? amountSpecified : amount0; // in case of rounding issues
             if (amount0 < 0)
                 TransferHelper.safeTransfer(
                     token0,
@@ -724,8 +747,8 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
                 );
 
             uint256 fees1 = exactInput
-                ? uint256(amountSpecified) - uint256(amount1) // TODO: check never negative
-                : SwapMath.swapFees(uint256(amount1), fee);
+                ? uint256(amountSpecified) - uint256(amount1)
+                : SwapMath.swapFees(uint256(amount1), fee, true);
             amount1 += int256(fees1);
 
             uint256 balance1Before = balance1();
@@ -735,7 +758,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
                 data
             );
             if (amount1 == 0 || balance1Before + uint256(amount1) > balance1())
-                revert Amount1LessThanMin(); // TODO: test amount1 == 0
+                revert Amount1LessThanMin();
 
             // account for protocol fees if fee on
             uint256 delta = _state.feeProtocol > 0
@@ -755,7 +778,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
             _state.sqrtPriceX96 = sqrtPriceX96After;
             _state.tick = TickMath.getTickAtSqrtRatio(sqrtPriceX96After);
         } else {
-            amount1 = !exactInput ? amountSpecified : amount1; // in case of rounding issues TODO: test
+            amount1 = !exactInput ? amountSpecified : amount1; // in case of rounding issues
             if (amount1 < 0)
                 TransferHelper.safeTransfer(
                     token1,
@@ -764,8 +787,8 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
                 );
 
             uint256 fees0 = exactInput
-                ? uint256(amountSpecified) - uint256(amount0) // TODO: check never negative
-                : SwapMath.swapFees(uint256(amount0), fee);
+                ? uint256(amountSpecified) - uint256(amount0)
+                : SwapMath.swapFees(uint256(amount0), fee, true);
             amount0 += int256(fees0);
 
             uint256 balance0Before = balance0();
@@ -775,7 +798,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
                 data
             );
             if (amount0 == 0 || balance0Before + uint256(amount0) > balance0())
-                revert Amount0LessThanMin(); // TODO: test amount0 == 0
+                revert Amount0LessThanMin();
 
             // account for protocol fees if fee on
             uint256 delta = _state.feeProtocol > 0
@@ -810,26 +833,34 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         );
     }
 
+    /// @inheritdoc IMarginalV1Pool
     function mint(
         address recipient,
         uint128 liquidityDelta,
         bytes calldata data
     ) external lock returns (uint256 shares, uint256 amount0, uint256 amount1) {
-        State memory _state = stateSynced();
         uint256 _totalSupply = totalSupply();
-        if (liquidityDelta == 0) revert InvalidLiquidityDelta();
+
+        bool initializing = (_totalSupply == 0);
+        if (initializing) initialize();
+
+        State memory _state = stateSynced();
+        uint128 liquidityDeltaMinimum = (initializing ? MINIMUM_LIQUIDITY : 0);
+        if (liquidityDelta <= liquidityDeltaMinimum)
+            revert InvalidLiquidityDelta();
 
         (amount0, amount1) = LiquidityMath.toAmounts(
             liquidityDelta,
             _state.sqrtPriceX96
         );
+        amount0 += 1; // rough round up on amounts in when add liquidity
+        amount1 += 1;
 
         // total liquidity is available liquidity if all locked liquidity was returned to pool
-        // TODO: verify no edge cases where _totalSupply == 0 but totalLiquidityAfter == liquidityDelta?
         uint128 totalLiquidityAfter = _state.liquidity +
             liquidityLocked +
             liquidityDelta;
-        shares = _totalSupply == 0
+        shares = initializing
             ? totalLiquidityAfter
             : Math.mulDiv(
                 _totalSupply,
@@ -853,13 +884,18 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         // update pool state to latest
         state = _state;
 
-        // TODO: min liquidity lock?
+        // lock min liquidity on initial mint to avoid stuck states with price
+        if (initializing) {
+            shares -= uint256(MINIMUM_LIQUIDITY);
+            _mint(address(this), MINIMUM_LIQUIDITY);
+        }
+
         _mint(recipient, shares);
 
         emit Mint(msg.sender, recipient, liquidityDelta, amount0, amount1);
     }
 
-    /// @dev Reverts if not enough liquidity available to exit due to outstanding positions
+    /// @inheritdoc IMarginalV1Pool
     function burn(
         address recipient,
         uint256 shares
@@ -870,7 +906,6 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
     {
         State memory _state = stateSynced();
         uint256 _totalSupply = totalSupply();
-        if (shares == 0 || shares > _totalSupply) revert InvalidShares();
 
         // total liquidity is available liquidity if all locked liquidity were returned to pool
         uint128 totalLiquidityBefore = _state.liquidity + liquidityLocked;
@@ -898,6 +933,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         emit Burn(msg.sender, recipient, liquidityDelta, amount0, amount1);
     }
 
+    /// @inheritdoc IMarginalV1Pool
     function setFeeProtocol(uint8 feeProtocol) external lock onlyFactoryOwner {
         if (!(feeProtocol == 0 || (feeProtocol >= 4 && feeProtocol <= 10)))
             revert InvalidFeeProtocol();
@@ -905,6 +941,7 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         state.feeProtocol = feeProtocol;
     }
 
+    /// @inheritdoc IMarginalV1Pool
     function collectProtocol(
         address recipient
     )
@@ -913,15 +950,14 @@ contract MarginalV1Pool is IMarginalV1Pool, ERC20 {
         onlyFactoryOwner
         returns (uint128 amount0, uint128 amount1)
     {
-        if (protocolFees.token0 == 0 || protocolFees.token1 == 0)
-            revert InvalidFeeProtocol();
+        // no zero check on protocolFees as will revert in amounts calculation
         amount0 = protocolFees.token0 - 1; // ensure slot not cleared for gas savings
         amount1 = protocolFees.token1 - 1;
 
-        protocolFees.token0 -= amount0;
+        protocolFees.token0 = 1;
         TransferHelper.safeTransfer(token0, recipient, amount0);
 
-        protocolFees.token1 -= amount1;
+        protocolFees.token1 = 1;
         TransferHelper.safeTransfer(token1, recipient, amount1);
 
         emit CollectProtocol(msg.sender, recipient, amount0, amount1);

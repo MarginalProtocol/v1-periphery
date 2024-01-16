@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
-pragma solidity 0.8.17;
+pragma solidity =0.8.15;
 
 import {Position} from "@marginal/v1-core/contracts/libraries/Position.sol";
 
@@ -132,13 +132,20 @@ contract MockPosition {
     }
 
     function liquidationRewards(
-        uint128 size,
-        uint24 reward
+        uint256 blockBaseFee,
+        uint256 blockBaseFeeMin,
+        uint256 gas,
+        uint24 premium
     ) external pure returns (uint256) {
-        return Position.liquidationRewards(size, reward);
+        return
+            Position.liquidationRewards(
+                blockBaseFee,
+                blockBaseFeeMin,
+                gas,
+                premium
+            );
     }
 
-    // TODO: test
     function marginMinimum(
         Position.Info memory position,
         uint24 maintenance

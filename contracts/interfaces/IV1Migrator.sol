@@ -2,14 +2,9 @@
 pragma solidity >=0.7.5;
 pragma abicoder v2;
 
-import {IMulticall} from "@uniswap/v3-periphery/contracts/interfaces/IMulticall.sol";
-import {ISelfPermit} from "@uniswap/v3-periphery/contracts/interfaces/ISelfPermit.sol";
-
-import {IPoolInitializer} from "./IPoolInitializer.sol";
-
 /// @title V1 Migrator
 /// @notice Enables migration of liqudity from Uniswap v3-compatible pairs into Marginal v1 pools
-interface IV1Migrator is IMulticall, ISelfPermit, IPoolInitializer {
+interface IV1Migrator {
     struct MigrateParams {
         uint256 tokenId; // tokenId of the Uniswap v3 NFT position to migrate
         uint128 liquidityToMigrate;

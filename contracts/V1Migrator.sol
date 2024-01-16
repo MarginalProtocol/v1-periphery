@@ -8,7 +8,6 @@ import {Multicall} from "@uniswap/v3-periphery/contracts/base/Multicall.sol";
 import {SelfPermit} from "@uniswap/v3-periphery/contracts/base/SelfPermit.sol";
 
 import {PeripheryImmutableState} from "./base/PeripheryImmutableState.sol";
-import {PoolInitializer} from "./base/PoolInitializer.sol";
 import {IRouter} from "./interfaces/IRouter.sol";
 import {IV1Migrator} from "./interfaces/IV1Migrator.sol";
 
@@ -16,7 +15,6 @@ import {IV1Migrator} from "./interfaces/IV1Migrator.sol";
 contract V1Migrator is
     IV1Migrator,
     PeripheryImmutableState,
-    PoolInitializer,
     Multicall,
     SelfPermit
 {

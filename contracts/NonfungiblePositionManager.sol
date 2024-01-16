@@ -42,12 +42,19 @@ contract NonfungiblePositionManager is
         uint256 indexed tokenId,
         uint256 size,
         uint256 debt,
-        uint256 amountIn
+        uint256 margin,
+        uint256 fees,
+        uint256 rewards
     );
     event Lock(uint256 indexed tokenId, uint256 marginAfter);
     event Free(uint256 indexed tokenId, uint256 marginAfter);
-    event Burn(uint256 indexed tokenId, uint256 amountIn, uint256 amountOut);
-    event Ignite(uint256 indexed tokenId, uint256 amountOut);
+    event Burn(
+        uint256 indexed tokenId,
+        uint256 amountIn,
+        uint256 amountOut,
+        uint256 rewards
+    );
+    event Ignite(uint256 indexed tokenId, uint256 amountOut, uint256 rewards);
     event Grab(uint256 indexed tokenId, uint256 rewards);
 
     error Unauthorized();
@@ -105,7 +112,14 @@ contract NonfungiblePositionManager is
         external
         payable
         checkDeadline(params.deadline)
-        returns (uint256 tokenId, uint256 size, uint256 debt, uint256 amountIn)
+        returns (
+            uint256 tokenId,
+            uint256 size,
+            uint256 debt,
+            uint256 margin,
+            uint256 fees,
+            uint256 rewards
+        )
     {
         IMarginalV1Pool pool = getPool(
             PoolAddress.PoolKey({
@@ -116,7 +130,7 @@ contract NonfungiblePositionManager is
             })
         );
 
-        (uint128 liquidity, uint160 sqrtPriceX96, , , , , , ) = pool.state();
+        (uint160 sqrtPriceX96, , uint128 liquidity, , , , , ) = pool.state();
         uint128 liquidityDelta = PositionAmounts.getLiquidityForSize(
             liquidity,
             sqrtPriceX96,
@@ -126,9 +140,7 @@ contract NonfungiblePositionManager is
         );
 
         uint256 positionId;
-        uint256 amount0;
-        uint256 amount1;
-        (positionId, size, debt, amount0, amount1) = open(
+        (positionId, size, debt, margin, fees, rewards) = open(
             OpenParams({
                 token0: params.token0,
                 token1: params.token1,
@@ -154,7 +166,6 @@ contract NonfungiblePositionManager is
                     : params.amountInMaximum
             })
         );
-        amountIn = amount0 > 0 ? amount0 : amount1;
 
         // @dev ok to call before set position since _safeMint not used so no callback
         _mint(params.recipient, (tokenId = _nextId++));
@@ -164,7 +175,10 @@ contract NonfungiblePositionManager is
             id: uint96(positionId)
         });
 
-        emit Mint(tokenId, size, debt, amountIn);
+        // refund any excess ETH from escrowed rewards at end of function given callback
+        refundETH();
+
+        emit Mint(tokenId, size, debt, margin, fees, rewards);
     }
 
     /// @inheritdoc INonfungiblePositionManager
@@ -255,7 +269,7 @@ contract NonfungiblePositionManager is
         payable
         onlyApprovedOrOwner(params.tokenId)
         checkDeadline(params.deadline)
-        returns (uint256 amountIn, uint256 amountOut)
+        returns (uint256 amountIn, uint256 amountOut, uint256 rewards)
     {
         Position memory position = _positions[params.tokenId];
         if (
@@ -271,7 +285,7 @@ contract NonfungiblePositionManager is
             ) != position.pool
         ) revert InvalidPoolKey();
 
-        (int256 amount0, int256 amount1) = settle(
+        (int256 amount0, int256 amount1, uint256 rewards) = settle(
             SettleParams({
                 token0: params.token0,
                 token1: params.token1,
@@ -292,7 +306,7 @@ contract NonfungiblePositionManager is
 
         _burn(params.tokenId);
 
-        emit Burn(params.tokenId, amountIn, amountOut);
+        emit Burn(params.tokenId, amountIn, amountOut, rewards);
     }
 
     /// @inheritdoc INonfungiblePositionManager
@@ -303,7 +317,7 @@ contract NonfungiblePositionManager is
         payable
         onlyApprovedOrOwner(params.tokenId)
         checkDeadline(params.deadline)
-        returns (uint256 amountOut)
+        returns (uint256 amountOut, uint256 rewards)
     {
         Position memory position = _positions[params.tokenId];
         if (
@@ -319,7 +333,7 @@ contract NonfungiblePositionManager is
             ) != position.pool
         ) revert InvalidPoolKey();
 
-        amountOut = flash(
+        (amountOut, rewards) = flash(
             FlashParams({
                 token0: params.token0,
                 token1: params.token1,
@@ -335,7 +349,10 @@ contract NonfungiblePositionManager is
 
         _burn(params.tokenId);
 
-        emit Ignite(params.tokenId, amountOut);
+        // refund any excess ETH from escrowed rewards at end of function given callback
+        refundETH();
+
+        emit Ignite(params.tokenId, amountOut, rewards);
     }
 
     /// @inheritdoc INonfungiblePositionManager
@@ -361,7 +378,7 @@ contract NonfungiblePositionManager is
             ) != position.pool
         ) revert InvalidPoolKey();
 
-        (uint256 rewards0, uint256 rewards1) = liquidate(
+        rewards = liquidate(
             LiquidateParams({
                 token0: params.token0,
                 token1: params.token1,
@@ -372,7 +389,6 @@ contract NonfungiblePositionManager is
                 id: position.id
             })
         );
-        rewards = rewards0 > 0 ? rewards0 : rewards1;
 
         emit Grab(params.tokenId, rewards);
     }

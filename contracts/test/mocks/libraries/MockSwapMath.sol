@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
-pragma solidity 0.8.17;
+pragma solidity =0.8.15;
 
 import {SwapMath} from "@marginal/v1-core/contracts/libraries/SwapMath.sol";
 
@@ -14,8 +14,9 @@ contract MockSwapMath {
 
     function swapFees(
         uint256 amountIn,
-        uint24 fee
+        uint24 fee,
+        bool lessFee
     ) external pure returns (uint256) {
-        return SwapMath.swapFees(amountIn, fee);
+        return SwapMath.swapFees(amountIn, fee, lessFee);
     }
 }

@@ -10,8 +10,10 @@ interface IQuoter {
     /// @dev Reverts if mint would revert
     /// @return size Position size in units of amount1 if zeroForOne == true else units of amount0
     /// @return debt Position debt in units of amount0 if zeroForOne == true else units of amount1
-    /// @return amountIn Amount of margin token in required to open position, includes fees and liquidation rewards set aside in pool
+    /// @return margin Amount of margin token in required to open position
     /// @return safeMarginMinimum The minimum margin requirements necessary to open position on pool while also being safe from liquidation
+    /// @return fees Amount of fees in margin token paid to open the position
+    /// @return rewards Amount of liquidation rewards in native (gas) token required to escrow to open the position
     /// @return safe Whether the position will be safe given current oracle price averaged over seconds ago
     /// @return liquidityAfter Pool liquidity after mint
     /// @return sqrtPriceX96After Pool sqrt price after mint
@@ -23,8 +25,10 @@ interface IQuoter {
         returns (
             uint256 size,
             uint256 debt,
-            uint256 amountIn,
+            uint256 margin,
             uint256 safeMarginMinimum,
+            uint256 fees,
+            uint256 rewards,
             bool safe,
             uint128 liquidityAfter,
             uint160 sqrtPriceX96After
