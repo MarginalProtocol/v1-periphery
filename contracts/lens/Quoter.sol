@@ -577,6 +577,9 @@ contract Quoter is
             liquidityDelta,
             sqrtPriceX96
         );
+        amount0 += 1;
+        amount1 += 1;
+
         if (amount0 < params.amount0Min) revert("amount0 less than min");
         if (amount1 < params.amount1Min) revert("amount1 less than min");
 

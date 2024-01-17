@@ -69,10 +69,10 @@ def test_router_exact_output_single__updates_state(
 
     # factor in fees
     if zero_for_one:
-        fees0 = swap_math_lib.swapFees(amount0, fee)
+        fees0 = swap_math_lib.swapFees(amount0, fee, True)
         amount0 += fees0
     else:
-        fees1 = swap_math_lib.swapFees(amount1, fee)
+        fees1 = swap_math_lib.swapFees(amount1, fee, True)
         amount1 += fees1
 
     # determine liquidity, sqrtPriceX96 after
@@ -167,10 +167,10 @@ def test_router_exact_output_single__transfers_funds(
 
     # factor in fees
     if zero_for_one:
-        fees0 = swap_math_lib.swapFees(amount0, fee)
+        fees0 = swap_math_lib.swapFees(amount0, fee, True)
         amount0 += fees0
     else:
-        fees1 = swap_math_lib.swapFees(amount1, fee)
+        fees1 = swap_math_lib.swapFees(amount1, fee, True)
         amount1 += fees1
 
     amount_in = amount0 if zero_for_one else amount1
@@ -273,10 +273,10 @@ def test_router_exact_output_single__returns_amount_in(
 
     # factor in fees
     if zero_for_one:
-        fees0 = swap_math_lib.swapFees(amount0, fee)
+        fees0 = swap_math_lib.swapFees(amount0, fee, True)
         amount0 += fees0
     else:
-        fees1 = swap_math_lib.swapFees(amount1, fee)
+        fees1 = swap_math_lib.swapFees(amount1, fee, True)
         amount1 += fees1
 
     amount_in = amount0 if zero_for_one else amount1
@@ -380,10 +380,10 @@ def test_router_exact_output_single__reverts_when_amount_in_greater_than_max(
 
     # factor in fees
     if zero_for_one:
-        fees0 = swap_math_lib.swapFees(amount0, fee)
+        fees0 = swap_math_lib.swapFees(amount0, fee, True)
         amount0 += fees0
     else:
-        fees1 = swap_math_lib.swapFees(amount1, fee)
+        fees1 = swap_math_lib.swapFees(amount1, fee, True)
         amount1 += fees1
 
     amount_in = amount0 if zero_for_one else amount1

@@ -9,12 +9,16 @@ from utils.constants import (
     MAINTENANCE_UNIT,
     FUNDING_PERIOD,
     TICK_CUMULATIVE_RATE_MAX,
+    BASE_FEE_MIN,
+    GAS_LIQUIDATE,
 )
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
 
 
 @pytest.fixture
-def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
+def mint_position(
+    pool_initialized_with_liquidity, position_lib, chain, manager, sender
+):
     def mint(zero_for_one: bool) -> int:
         state = pool_initialized_with_liquidity.state()
         maintenance = pool_initialized_with_liquidity.maintenance()
@@ -50,7 +54,17 @@ def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
             sender.address,
             deadline,
         )
-        tx = manager.mint(mint_params, sender=sender)
+
+        premium = pool_initialized_with_liquidity.rewardPremium()
+        base_fee = chain.blocks[-1].base_fee
+        rewards = position_lib.liquidationRewards(
+            base_fee,
+            BASE_FEE_MIN,
+            GAS_LIQUIDATE,
+            premium,
+        )
+
+        tx = manager.mint(mint_params, sender=sender, value=rewards)
         token_id = tx.decode_logs(manager.Mint)[0].tokenId
         return int(token_id)
 
@@ -120,24 +134,26 @@ def test_manager_burn__transfers_funds(
 ):
     token_id = mint_position(zero_for_one)
 
-    reward = pool_initialized_with_liquidity.reward()
     position_id = pool_initialized_with_liquidity.state().totalPositions - 1
     key = get_position_key(manager.address, position_id)
     position = pool_initialized_with_liquidity.positions(key)
 
-    rewards = position_lib.liquidationRewards(position.size, reward)
+    rewards = position.rewards
 
     token_in = token0 if zero_for_one else token1
     token_out = token1 if zero_for_one else token0
 
     amount_in = position.debt0 if zero_for_one else position.debt1
-    amount_out = position.size + position.margin + rewards
+    amount_out = position.size + position.margin
 
     balance_in_sender = token_in.balanceOf(sender.address)
     balance_in_pool = token_in.balanceOf(pool_initialized_with_liquidity.address)
 
     balance_out_alice = token_out.balanceOf(alice.address)
     balance_out_pool = token_out.balanceOf(pool_initialized_with_liquidity.address)
+
+    balancee_alice = alice.balance
+    balancee_pool = pool_initialized_with_liquidity.balance
 
     deadline = chain.pending_timestamp + 3600
     burn_params = (
@@ -162,6 +178,9 @@ def test_manager_burn__transfers_funds(
         token_in.balanceOf(pool_initialized_with_liquidity.address)
         == balance_in_pool + amount_in
     )
+
+    assert alice.balance == balancee_alice + rewards
+    assert pool_initialized_with_liquidity.balance == balancee_pool - rewards
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
@@ -238,14 +257,13 @@ def test_manager_burn__emits_burn(
 ):
     token_id = mint_position(zero_for_one)
 
-    reward = pool_initialized_with_liquidity.reward()
     position_id = pool_initialized_with_liquidity.state().totalPositions - 1
     key = get_position_key(manager.address, position_id)
     position = pool_initialized_with_liquidity.positions(key)
 
-    rewards = position_lib.liquidationRewards(position.size, reward)
+    rewards = position.rewards
     amount_in = position.debt0 if zero_for_one else position.debt1
-    amount_out = position.size + position.margin + rewards
+    amount_out = position.size + position.margin
 
     deadline = chain.pending_timestamp + 3600
     burn_params = (
@@ -263,8 +281,10 @@ def test_manager_burn__emits_burn(
 
     event = events[0]
     assert event.tokenId == token_id
+    assert event.recipient == alice.address
     assert event.amountIn == amount_in
     assert event.amountOut == amount_out
+    assert event.rewards == rewards
     # assert tx.return_value == (amount_in, amount_out)  # TODO: fix
 
 

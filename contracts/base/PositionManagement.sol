@@ -36,6 +36,7 @@ abstract contract PositionManagement is
     error DebtGreaterThanMax(uint256 debt);
     error AmountInGreaterThanMax(uint256 amountIn);
     error AmountOutLessThanMin(uint256 amountOut);
+    error RewardsLessThanMin(uint256 rewardsMinimum);
 
     /// @dev Returns the pool for the given token pair and maintenance. The pool contract may or may not exist.
     function getPool(
@@ -88,6 +89,8 @@ abstract contract PositionManagement is
             PoolConstants.gasLiquidate,
             PoolConstants.rewardPremium
         ); // deposited for liquidation reward escrow
+        // @dev use address(this).balance and not msg.value to avoid issues with multicall
+        if (address(this).balance < rewards) revert RewardsLessThanMin(rewards); // only send the min required
 
         uint256 amount0;
         uint256 amount1;
@@ -237,7 +240,9 @@ abstract contract PositionManagement is
         IMarginalV1Pool pool = getPool(poolKey);
 
         address payer = address(this);
-        (int256 amount0, int256 amount1, uint256 rewards) = pool.settle(
+        int256 amount0;
+        int256 amount1;
+        (amount0, amount1, rewards) = pool.settle(
             payer,
             params.id,
             abi.encode(PositionCallbackData({poolKey: poolKey, payer: payer}))

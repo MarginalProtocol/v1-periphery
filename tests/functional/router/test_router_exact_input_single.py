@@ -58,7 +58,7 @@ def test_router_exact_input_single__updates_state(
     router.exactInputSingle(params, sender=sender)
 
     # calculate liquidity, sqrtPriceX96 update in slightly diff way than on-chain. check close
-    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee)
+    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee, False)
     sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextSwap(
         state.liquidity,
         state.sqrtPriceX96,
@@ -148,7 +148,7 @@ def test_router_exact_input_single__transfers_funds(
     router.exactInputSingle(params, sender=sender)
 
     # calculate amount out
-    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee)
+    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee, False)
     sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextSwap(
         state.liquidity,
         state.sqrtPriceX96,
@@ -247,7 +247,7 @@ def test_router_exact_input_single__returns_amount_out(
     tx = router.exactInputSingle(params, sender=sender)
 
     # calculate amount out
-    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee)
+    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee, False)
     sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextSwap(
         state.liquidity,
         state.sqrtPriceX96,
@@ -347,7 +347,7 @@ def test_router_exact_input_single__reverts_when_amount_out_less_than_min(
     amount_in = 1 * reserve0 // 100 if zero_for_one else 1 * reserve1 // 100
 
     # calculate amount out
-    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee)
+    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee, False)
     sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextSwap(
         state.liquidity,
         state.sqrtPriceX96,

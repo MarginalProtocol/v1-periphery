@@ -51,11 +51,21 @@ abstract contract PeripheryPayments is
     }
 
     /// @inheritdoc IPeripheryPayments
-    function refundETH() public payable override {
+    function refundETH() external payable override {
         if (address(this).balance > 0)
             TransferHelper.safeTransferETH(msg.sender, address(this).balance);
     }
 
+    /// @inheritdoc IPeripheryPayments
+    function sweepETH(uint256 amountMinimum, address recipient) public payable {
+        uint256 balanceETH = address(this).balance;
+        require(balanceETH >= amountMinimum, "Insufficient ETH");
+
+        if (balanceETH > 0)
+            TransferHelper.safeTransferETH(recipient, balanceETH);
+    }
+
+    /// @notice Pay ERC20 token to recipient
     /// @param token The token to pay
     /// @param payer The entity that must pay
     /// @param recipient The entity that will receive payment
@@ -79,7 +89,7 @@ abstract contract PeripheryPayments is
         }
     }
 
-    /// @notice Balance of token held by this contract
+    /// @notice Balance of ERC20 token held by this contract
     /// @param token The token to check
     /// @return value The balance amount
     function balance(address token) internal view returns (uint256 value) {

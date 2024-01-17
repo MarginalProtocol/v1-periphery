@@ -6,14 +6,16 @@ from utils.constants import (
     MIN_SQRT_RATIO,
     MAX_SQRT_RATIO,
     MAINTENANCE_UNIT,
-    FUNDING_PERIOD,
-    TICK_CUMULATIVE_RATE_MAX,
+    BASE_FEE_MIN,
+    GAS_LIQUIDATE,
 )
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
 
 
 @pytest.fixture
-def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
+def mint_position(
+    pool_initialized_with_liquidity, chain, position_lib, manager, sender
+):
     def mint(zero_for_one: bool) -> int:
         state = pool_initialized_with_liquidity.state()
         maintenance = pool_initialized_with_liquidity.maintenance()
@@ -49,7 +51,17 @@ def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
             sender.address,
             deadline,
         )
-        tx = manager.mint(mint_params, sender=sender)
+
+        premium = pool_initialized_with_liquidity.rewardPremium()
+        base_fee = chain.blocks[-1].base_fee
+        rewards = position_lib.liquidationRewards(
+            base_fee,
+            BASE_FEE_MIN,
+            GAS_LIQUIDATE,
+            premium,
+        )
+
+        tx = manager.mint(mint_params, sender=sender, value=rewards)
         token_id = tx.decode_logs(manager.Mint)[0].tokenId
         return int(token_id)
 
@@ -69,15 +81,12 @@ def test_manager_lock__adjusts_position(
     mint_position,
 ):
     token_id = mint_position(zero_for_one)
-
     maintenance = pool_initialized_with_liquidity.maintenance()
-    reward = pool_initialized_with_liquidity.reward()
 
     position_id = pool_initialized_with_liquidity.state().totalPositions - 1
     key = get_position_key(manager.address, position_id)
     position = pool_initialized_with_liquidity.positions(key)
 
-    block_timestamp_next = chain.pending_timestamp
     deadline = chain.pending_timestamp + 3600
     margin_in = (position.margin * 25) // 100
     lock_params = (
@@ -92,22 +101,9 @@ def test_manager_lock__adjusts_position(
     )
     manager.lock(lock_params, sender=sender)
 
-    state = pool_initialized_with_liquidity.state()
-    tick_cumulative_last = state.tickCumulative
-    oracle_tick_cumulatives, _ = mock_univ3_pool.observe([0])
-
-    position = position_lib.sync(
-        position,
-        block_timestamp_next,
-        tick_cumulative_last,
-        oracle_tick_cumulatives[0],
-        TICK_CUMULATIVE_RATE_MAX,
-        FUNDING_PERIOD,
-    )
     position.margin += margin_in
-
     margin_min = position_lib.marginMinimum(position, maintenance)
-    rewards = position_lib.liquidationRewards(position.size, reward)
+    rewards = position.rewards
 
     assert pool_initialized_with_liquidity.positions(key) == position
     assert manager.positions(token_id) == (
@@ -209,6 +205,7 @@ def test_manager_lock__emits_lock(
 
     event = events[0]
     assert event.tokenId == token_id
+    assert event.recipient == alice.address
     assert event.marginAfter == position.margin
     # assert tx.return_value == position.margin  # TODO: fix
 

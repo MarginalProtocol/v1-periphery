@@ -28,4 +28,13 @@ interface IPeripheryPayments {
         uint256 amountMinimum,
         address recipient
     ) external payable;
+
+    /// @notice Transfers the full amount of ETH held by this contract to recipient
+    /// @dev The amountMinimum parameter prevents malicious contracts from stealing the ETH from users
+    /// @param amountMinimum The minimum amount of ETH required for a transfer
+    /// @param recipient The destination address of the ETH
+    function sweepETH(
+        uint256 amountMinimum,
+        address recipient
+    ) external payable;
 }

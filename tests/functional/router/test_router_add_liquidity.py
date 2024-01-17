@@ -20,7 +20,6 @@ def test_router_add_liquidity__updates_liquidity(
     liquidity_delta = liquidity_amounts_lib.getLiquidityForAmounts(
         state.sqrtPriceX96, amount0_desired, amount1_desired
     )
-    amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
 
     amount0_min = 0
     amount1_min = 0
@@ -31,8 +30,8 @@ def test_router_add_liquidity__updates_liquidity(
         pool_initialized_with_liquidity.maintenance(),
         pool_initialized_with_liquidity.oracle(),
         alice.address,
-        amount0,
-        amount1,
+        amount0_desired,
+        amount1_desired,
         amount0_min,
         amount1_min,
         deadline,
@@ -69,7 +68,6 @@ def test_router_add_liquidity__mints_shares(
     liquidity_delta = liquidity_amounts_lib.getLiquidityForAmounts(
         state.sqrtPriceX96, amount0_desired, amount1_desired
     )
-    amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
 
     shares = (liquidity_delta * total_shares_before) // total_liquidity_before
     amount0_min = 0
@@ -81,8 +79,8 @@ def test_router_add_liquidity__mints_shares(
         pool_initialized_with_liquidity.maintenance(),
         pool_initialized_with_liquidity.oracle(),
         alice.address,
-        amount0,
-        amount1,
+        amount0_desired,
+        amount1_desired,
         amount0_min,
         amount1_min,
         deadline,
@@ -124,6 +122,8 @@ def test_router_add_liquidity__transfers_funds(
         state.sqrtPriceX96, amount0_desired, amount1_desired
     )
     amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
+    amount0 += 1  # @dev rough round up
+    amount1 += 1
 
     amount0_min = 0
     amount1_min = 0
@@ -134,8 +134,8 @@ def test_router_add_liquidity__transfers_funds(
         pool_initialized_with_liquidity.maintenance(),
         pool_initialized_with_liquidity.oracle(),
         alice.address,
-        amount0,
-        amount1,
+        amount0_desired,
+        amount1_desired,
         amount0_min,
         amount1_min,
         deadline,
@@ -178,6 +178,9 @@ def test_router_add_liquidity__emits_increase_liquidity(
         state.sqrtPriceX96, amount0_desired, amount1_desired
     )
     amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
+    amount0 += 1  # @dev rough round up
+    amount1 += 1
+
     shares = (liquidity_delta * total_shares_before) // total_liquidity_before
 
     amount0_min = 0
@@ -189,8 +192,8 @@ def test_router_add_liquidity__emits_increase_liquidity(
         pool_initialized_with_liquidity.maintenance(),
         pool_initialized_with_liquidity.oracle(),
         alice.address,
-        amount0,
-        amount1,
+        amount0_desired,
+        amount1_desired,
         amount0_min,
         amount1_min,
         deadline,
@@ -227,11 +230,6 @@ def test_router_add_liquidity__reverts_when_past_deadline(
         liquidity_delta_desired, state.sqrtPriceX96
     )
 
-    liquidity_delta = liquidity_amounts_lib.getLiquidityForAmounts(
-        state.sqrtPriceX96, amount0_desired, amount1_desired
-    )
-    amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
-
     amount0_min = 0
     amount1_min = 0
     deadline = chain.pending_timestamp - 1
@@ -241,8 +239,8 @@ def test_router_add_liquidity__reverts_when_past_deadline(
         pool_initialized_with_liquidity.maintenance(),
         pool_initialized_with_liquidity.oracle(),
         alice.address,
-        amount0,
-        amount1,
+        amount0_desired,
+        amount1_desired,
         amount0_min,
         amount1_min,
         deadline,
@@ -272,6 +270,8 @@ def test_router_add_liquidity__reverts_when_amount0_less_than_min(
         state.sqrtPriceX96, amount0_desired, amount1_desired
     )
     amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
+    amount0 += 1  # @dev rough round up
+    amount1 += 1
 
     amount0_min = amount0 + 1
     amount1_min = 0
@@ -282,8 +282,8 @@ def test_router_add_liquidity__reverts_when_amount0_less_than_min(
         pool_initialized_with_liquidity.maintenance(),
         pool_initialized_with_liquidity.oracle(),
         alice.address,
-        amount0,
-        amount1,
+        amount0_desired,
+        amount1_desired,
         amount0_min,
         amount1_min,
         deadline,
@@ -313,6 +313,8 @@ def test_router_add_liquidity__reverts_when_amount1_less_than_min(
         state.sqrtPriceX96, amount0_desired, amount1_desired
     )
     amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
+    amount0 += 1  # @dev rough round up
+    amount1 += 1
 
     amount0_min = 0
     amount1_min = amount1 + 1
@@ -323,8 +325,8 @@ def test_router_add_liquidity__reverts_when_amount1_less_than_min(
         pool_initialized_with_liquidity.maintenance(),
         pool_initialized_with_liquidity.oracle(),
         alice.address,
-        amount0,
-        amount1,
+        amount0_desired,
+        amount1_desired,
         amount0_min,
         amount1_min,
         deadline,

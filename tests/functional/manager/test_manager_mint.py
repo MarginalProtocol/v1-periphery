@@ -7,7 +7,8 @@ from utils.constants import (
     MAX_SQRT_RATIO,
     MAINTENANCE_UNIT,
     FEE,
-    REWARD,
+    BASE_FEE_MIN,
+    GAS_LIQUIDATE,
 )
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
 
@@ -83,13 +84,26 @@ def test_manager_mint__opens_position(
         sender.address,
         deadline,
     )
-    manager.mint(mint_params, sender=sender)
+
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    rewards = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+
+    manager.mint(mint_params, sender=sender, value=rewards)
 
     owner = manager.address
     id = state.totalPositions
     key = get_position_key(owner, id)
     result = pool_initialized_with_liquidity.positions(key)
+
+    position.rewards = result.rewards
     assert result == position
+    assert rewards >= result.rewards
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
@@ -99,6 +113,7 @@ def test_manager_mint__mints_token(
     zero_for_one,
     sender,
     chain,
+    position_lib,
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
@@ -132,7 +147,17 @@ def test_manager_mint__mints_token(
         sender.address,
         deadline,
     )
-    manager.mint(mint_params, sender=sender)
+
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    rewards = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+
+    manager.mint(mint_params, sender=sender, value=rewards)
 
     next_id = 1  # starts at 1 for nft position manager
     assert manager.ownerOf(next_id) == sender.address
@@ -150,7 +175,6 @@ def test_manager_mint__sets_position_ref(
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
-    reward = pool_initialized_with_liquidity.reward()
     oracle = pool_initialized_with_liquidity.oracle()
 
     sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
@@ -181,7 +205,17 @@ def test_manager_mint__sets_position_ref(
         sender.address,
         deadline,
     )
-    manager.mint(mint_params, sender=sender)
+
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    rewards = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+
+    manager.mint(mint_params, sender=sender, value=rewards)
 
     position_id = state.totalPositions
     owner = manager.address
@@ -190,7 +224,6 @@ def test_manager_mint__sets_position_ref(
     position = pool_initialized_with_liquidity.positions(key)
 
     margin_min = position_lib.marginMinimum(position, maintenance)
-    rewards = position_lib.liquidationRewards(position.size, reward)
 
     next_id = 1
     assert manager.positions(next_id) == (
@@ -203,7 +236,7 @@ def test_manager_mint__sets_position_ref(
         margin_min,  # oracle tick == pool tick in conftest.py
         position.liquidated,
         True,  # should be safe
-        rewards,
+        position.rewards,
     )
 
 
@@ -239,6 +272,9 @@ def test_manager_mint__transfers_funds(
     balance_sender = token.balanceOf(sender.address)
     balance_pool = token.balanceOf(pool_initialized_with_liquidity.address)
 
+    balancee_sender = sender.balance
+    balancee_pool = pool_initialized_with_liquidity.balance
+
     mint_params = (
         pool_initialized_with_liquidity.token0(),
         pool_initialized_with_liquidity.token1(),
@@ -254,7 +290,17 @@ def test_manager_mint__transfers_funds(
         sender.address,
         deadline,
     )
-    manager.mint(mint_params, sender=sender)
+
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    rewards = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+
+    tx = manager.mint(mint_params, sender=sender, value=rewards)
 
     position_id = state.totalPositions
     owner = manager.address
@@ -262,14 +308,91 @@ def test_manager_mint__transfers_funds(
     position = pool_initialized_with_liquidity.positions(key)
 
     fees = position_lib.fees(position.size, FEE)
-    rewards = position_lib.liquidationRewards(position.size, REWARD)
-    amount_in = position.margin + rewards + fees
+    amount_in = position.margin + fees
 
     assert token.balanceOf(sender.address) == balance_sender - amount_in
     assert (
         token.balanceOf(pool_initialized_with_liquidity.address)
         == balance_pool + amount_in
     )
+
+    assert (
+        sender.balance
+        == balancee_sender - position.rewards - tx.gas_used * tx.gas_price
+    )
+    assert pool_initialized_with_liquidity.balance == balancee_pool + position.rewards
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_mint__refunds_eth(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    chain,
+    token0,
+    token1,
+    position_lib,
+):
+    state = pool_initialized_with_liquidity.state()
+    maintenance = pool_initialized_with_liquidity.maintenance()
+    oracle = pool_initialized_with_liquidity.oracle()
+
+    sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    reserve = reserve1 if zero_for_one else reserve0
+
+    size = reserve * 1 // 100  # 1% of reserves
+    margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
+    size_min = (size * 80) // 100
+    debt_max = 2**128 - 1
+    amount_in_max = 2**256 - 1
+    deadline = chain.pending_timestamp + 3600
+
+    balancee_sender = sender.balance
+    balancee_pool = pool_initialized_with_liquidity.balance
+
+    mint_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        maintenance,
+        oracle,
+        zero_for_one,
+        size,
+        size_min,
+        debt_max,
+        amount_in_max,
+        sqrt_price_limit_x96,
+        margin,
+        sender.address,
+        deadline,
+    )
+
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    rewards = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+    value = rewards * 2
+
+    tx = manager.mint(mint_params, sender=sender, value=value)
+
+    position_id = state.totalPositions
+    owner = manager.address
+    key = get_position_key(owner, position_id)
+    position = pool_initialized_with_liquidity.positions(key)
+
+    assert value > position.rewards
+    assert (
+        sender.balance
+        == balancee_sender - position.rewards - tx.gas_used * tx.gas_price
+    )
+    assert pool_initialized_with_liquidity.balance == balancee_pool + position.rewards
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
@@ -313,17 +436,24 @@ def test_manager_mint__emits_mint(
         sender.address,
         deadline,
     )
-    tx = manager.mint(mint_params, sender=sender)
+
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    rewards = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+
+    tx = manager.mint(mint_params, sender=sender, value=rewards)
 
     position_id = state.totalPositions
     owner = manager.address
     key = get_position_key(owner, position_id)
     position = pool_initialized_with_liquidity.positions(key)
     debt = position.debt0 if zero_for_one else position.debt1
-
     fees = position_lib.fees(position.size, FEE)
-    rewards = position_lib.liquidationRewards(position.size, REWARD)
-    amount_in = position.margin + rewards + fees
 
     next_id = 1
     events = tx.decode_logs(manager.Mint)
@@ -331,9 +461,12 @@ def test_manager_mint__emits_mint(
 
     event = events[0]
     assert event.tokenId == next_id
+    assert event.recipient == sender.address
     assert event.size == position.size
     assert event.debt == debt
-    assert event.amountIn == amount_in
+    assert event.margin == position.margin
+    assert event.fees == fees
+    assert event.rewards == position.rewards
     # assert tx.return_value == (next_id, position.size, debt)  # TODO: fix
 
 
@@ -344,6 +477,7 @@ def test_manager_mint__when_sqrt_price_limit_x96_is_zero(
     zero_for_one,
     sender,
     chain,
+    position_lib,
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
@@ -377,7 +511,17 @@ def test_manager_mint__when_sqrt_price_limit_x96_is_zero(
         sender.address,
         deadline,
     )
-    tx = manager.mint(mint_params, sender=sender)
+
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    rewards = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+
+    tx = manager.mint(mint_params, sender=sender, value=rewards)
     token_id = tx.decode_logs(manager.Mint)[0].tokenId
     assert token_id == 1  # token with ID 1 minted
 
@@ -389,6 +533,7 @@ def test_manager_mint__when_debt_max_is_zero(
     zero_for_one,
     sender,
     chain,
+    position_lib,
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
@@ -422,7 +567,17 @@ def test_manager_mint__when_debt_max_is_zero(
         sender.address,
         deadline,
     )
-    tx = manager.mint(mint_params, sender=sender)
+
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    rewards = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+
+    tx = manager.mint(mint_params, sender=sender, value=rewards)
     token_id = tx.decode_logs(manager.Mint)[0].tokenId
     assert token_id == 1  # token with ID 1 minted
 
@@ -434,6 +589,7 @@ def test_manager_mint__when_amount_in_max_is_zero(
     zero_for_one,
     sender,
     chain,
+    position_lib,
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
@@ -467,7 +623,17 @@ def test_manager_mint__when_amount_in_max_is_zero(
         sender.address,
         deadline,
     )
-    tx = manager.mint(mint_params, sender=sender)
+
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    rewards = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+
+    tx = manager.mint(mint_params, sender=sender, value=rewards)
     token_id = tx.decode_logs(manager.Mint)[0].tokenId
     assert token_id == 1  # token with ID 1 minted
 
@@ -485,6 +651,7 @@ def test_manager_mint__reverts_when_past_deadline(
     zero_for_one,
     sender,
     chain,
+    position_lib,
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
@@ -519,8 +686,17 @@ def test_manager_mint__reverts_when_past_deadline(
         deadline,
     )
 
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    rewards = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+
     with reverts("Transaction too old"):
-        manager.mint(mint_params, sender=sender)
+        manager.mint(mint_params, sender=sender, value=rewards)
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
@@ -586,8 +762,18 @@ def test_manager_mint__reverts_when_size_less_than_min(
         deadline,
     )
 
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    rewards = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+    rewards *= 100  # set much higher since tx going to revert
+
     with reverts(manager.SizeLessThanMin, size=position.size):
-        manager.mint(mint_params, sender=sender)
+        manager.mint(mint_params, sender=sender, value=rewards)
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
@@ -654,8 +840,18 @@ def test_manager_mint__reverts_when_debt_greater_than_max(
         deadline,
     )
 
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    rewards = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+    rewards *= 100  # set much higher since tx going to revert
+
     with reverts(manager.DebtGreaterThanMax, debt=debt):
-        manager.mint(mint_params, sender=sender)
+        manager.mint(mint_params, sender=sender, value=rewards)
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
@@ -703,9 +899,17 @@ def test_manager_mint__reverts_when_amount_in_greater_than_max(
         0,
     )
     fees = position_lib.fees(position.size, FEE)
-    rewards = position_lib.liquidationRewards(position.size, REWARD)
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    rewards = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+    rewards *= 100  # set much higher since tx going to revert
 
-    amount_in = margin + rewards + fees
+    amount_in = margin + fees
     amount_in_max = amount_in - 1
     debt_max = 2**128 - 1
 
@@ -726,4 +930,53 @@ def test_manager_mint__reverts_when_amount_in_greater_than_max(
     )
 
     with reverts(manager.AmountInGreaterThanMax, amountIn=amount_in):
+        manager.mint(mint_params, sender=sender, value=rewards)
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_manager_mint__reverts_when_liquidation_rewards_less_than_min(
+    pool_initialized_with_liquidity,
+    manager,
+    zero_for_one,
+    sender,
+    chain,
+    position_lib,
+    sqrt_price_math_lib,
+    position_amounts_lib,
+):
+    state = pool_initialized_with_liquidity.state()
+    maintenance = pool_initialized_with_liquidity.maintenance()
+    oracle = pool_initialized_with_liquidity.oracle()
+
+    sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    reserve = reserve1 if zero_for_one else reserve0
+
+    size = reserve * 1 // 100  # 1% of reserves
+    margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
+    size_min = (size * 80) // 100
+    deadline = chain.pending_timestamp + 3600
+
+    amount_in_max = 2**256 - 1
+    debt_max = 2**128 - 1
+
+    mint_params = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        maintenance,
+        oracle,
+        zero_for_one,
+        size,
+        size_min,
+        debt_max,
+        amount_in_max,
+        sqrt_price_limit_x96,
+        margin,
+        sender.address,
+        deadline,
+    )
+
+    with reverts(manager.RewardsLessThanMin):
         manager.mint(mint_params, sender=sender)

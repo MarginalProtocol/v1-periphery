@@ -40,22 +40,41 @@ contract NonfungiblePositionManager is
 
     event Mint(
         uint256 indexed tokenId,
+        address indexed recipient,
         uint256 size,
         uint256 debt,
         uint256 margin,
         uint256 fees,
         uint256 rewards
     );
-    event Lock(uint256 indexed tokenId, uint256 marginAfter);
-    event Free(uint256 indexed tokenId, uint256 marginAfter);
+    event Lock(
+        uint256 indexed tokenId,
+        address indexed recipient,
+        uint256 marginAfter
+    );
+    event Free(
+        uint256 indexed tokenId,
+        address indexed recipient,
+        uint256 marginAfter
+    );
     event Burn(
         uint256 indexed tokenId,
+        address indexed recipient,
         uint256 amountIn,
         uint256 amountOut,
         uint256 rewards
     );
-    event Ignite(uint256 indexed tokenId, uint256 amountOut, uint256 rewards);
-    event Grab(uint256 indexed tokenId, uint256 rewards);
+    event Ignite(
+        uint256 indexed tokenId,
+        address indexed recipient,
+        uint256 amountOut,
+        uint256 rewards
+    );
+    event Grab(
+        uint256 indexed tokenId,
+        address indexed recipient,
+        uint256 rewards
+    );
 
     error Unauthorized();
     error InvalidPoolKey();
@@ -139,6 +158,7 @@ contract NonfungiblePositionManager is
             params.sizeDesired
         );
 
+        uint256 _balance = address(this).balance;
         uint256 positionId;
         (positionId, size, debt, margin, fees, rewards) = open(
             OpenParams({
@@ -175,10 +195,10 @@ contract NonfungiblePositionManager is
             id: uint96(positionId)
         });
 
-        // refund any excess ETH from escrowed rewards at end of function given callback
-        refundETH();
+        // sweep any excess ETH from escrowed rewards to sender at end of function given callback
+        sweepETH(_balance - rewards, msg.sender);
 
-        emit Mint(tokenId, size, debt, margin, fees, rewards);
+        emit Mint(tokenId, params.recipient, size, debt, margin, fees, rewards);
     }
 
     /// @inheritdoc INonfungiblePositionManager
@@ -218,7 +238,7 @@ contract NonfungiblePositionManager is
         );
         margin = margin0 > 0 ? margin0 : margin1;
 
-        emit Lock(params.tokenId, margin);
+        emit Lock(params.tokenId, params.recipient, margin);
     }
 
     /// @inheritdoc INonfungiblePositionManager
@@ -258,7 +278,7 @@ contract NonfungiblePositionManager is
         );
         margin = margin0 > 0 ? margin0 : margin1;
 
-        emit Free(params.tokenId, margin);
+        emit Free(params.tokenId, params.recipient, margin);
     }
 
     /// @inheritdoc INonfungiblePositionManager
@@ -306,7 +326,13 @@ contract NonfungiblePositionManager is
 
         _burn(params.tokenId);
 
-        emit Burn(params.tokenId, amountIn, amountOut, rewards);
+        emit Burn(
+            params.tokenId,
+            params.recipient,
+            amountIn,
+            amountOut,
+            rewards
+        );
     }
 
     /// @inheritdoc INonfungiblePositionManager
@@ -349,10 +375,10 @@ contract NonfungiblePositionManager is
 
         _burn(params.tokenId);
 
-        // refund any excess ETH from escrowed rewards at end of function given callback
-        refundETH();
+        // sweep escrowed ETH rewards to recipient at end of function given callback
+        sweepETH(rewards, params.recipient);
 
-        emit Ignite(params.tokenId, amountOut, rewards);
+        emit Ignite(params.tokenId, params.recipient, amountOut, rewards);
     }
 
     /// @inheritdoc INonfungiblePositionManager
@@ -390,6 +416,6 @@ contract NonfungiblePositionManager is
             })
         );
 
-        emit Grab(params.tokenId, rewards);
+        emit Grab(params.tokenId, params.recipient, rewards);
     }
 }

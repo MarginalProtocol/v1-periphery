@@ -9,12 +9,16 @@ from utils.constants import (
     FUNDING_PERIOD,
     SECONDS_AGO,
     TICK_CUMULATIVE_RATE_MAX,
+    BASE_FEE_MIN,
+    GAS_LIQUIDATE,
 )
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
 
 
 @pytest.fixture
-def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
+def mint_position(
+    pool_initialized_with_liquidity, chain, position_lib, manager, sender
+):
     def mint(zero_for_one: bool) -> int:
         state = pool_initialized_with_liquidity.state()
         maintenance = pool_initialized_with_liquidity.maintenance()
@@ -50,7 +54,17 @@ def mint_position(pool_initialized_with_liquidity, chain, manager, sender):
             sender.address,
             deadline,
         )
-        tx = manager.mint(mint_params, sender=sender)
+
+        premium = pool_initialized_with_liquidity.rewardPremium()
+        base_fee = chain.blocks[-1].base_fee
+        rewards = position_lib.liquidationRewards(
+            base_fee,
+            BASE_FEE_MIN,
+            GAS_LIQUIDATE,
+            premium,
+        )
+
+        tx = manager.mint(mint_params, sender=sender, value=rewards)
         token_id = tx.decode_logs(manager.Mint)[0].tokenId
         return int(token_id)
 
@@ -106,7 +120,6 @@ def test_manager_grab__liquidates_position(
     assert manager_position.safe is False
 
     maintenance = pool_initialized_with_liquidity.maintenance()
-    reward = pool_initialized_with_liquidity.reward()
 
     position_id = pool_initialized_with_liquidity.state().totalPositions - 1
     key = get_position_key(manager.address, position_id)
@@ -141,8 +154,6 @@ def test_manager_grab__liquidates_position(
     position = position_lib.liquidate(position)
 
     margin_min = position_lib.marginMinimum(position, maintenance)
-    rewards = position_lib.liquidationRewards(position.size, reward)
-
     assert pool_initialized_with_liquidity.positions(key) == position
     assert manager.positions(token_id) == (
         pool_initialized_with_liquidity.address,
@@ -154,7 +165,7 @@ def test_manager_grab__liquidates_position(
         margin_min,
         position.liquidated,
         False,  # should be unsafe since liquidated
-        rewards,
+        position.rewards,
     )
 
 
@@ -175,16 +186,15 @@ def test_manager_grab__transfers_funds(
     token_id = mint_position(zero_for_one)
     adjust_oracle(zero_for_one)  # makes position unsafe
 
-    reward = pool_initialized_with_liquidity.reward()
     position_id = pool_initialized_with_liquidity.state().totalPositions - 1
     key = get_position_key(manager.address, position_id)
     position = pool_initialized_with_liquidity.positions(key)
 
     token_out = token0 if not zero_for_one else token1
-    amount_out = position_lib.liquidationRewards(position.size, reward)
+    amount_out = position.rewards
 
-    balance_pool = token_out.balanceOf(pool_initialized_with_liquidity.address)
-    balance_alice = token_out.balanceOf(alice.address)
+    balancee_pool = pool_initialized_with_liquidity.balance
+    balancee_alice = alice.balance
 
     deadline = chain.pending_timestamp + 3600
     grab_params = (
@@ -198,11 +208,8 @@ def test_manager_grab__transfers_funds(
     )
     manager.grab(grab_params, sender=bob)
 
-    assert token_out.balanceOf(alice.address) == balance_alice + amount_out
-    assert (
-        token_out.balanceOf(pool_initialized_with_liquidity.address)
-        == balance_pool - amount_out
-    )
+    assert alice.balance == balancee_alice + amount_out
+    assert pool_initialized_with_liquidity.balance == balancee_pool - amount_out
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
@@ -220,12 +227,11 @@ def test_manager_grab__emits_grab(
     token_id = mint_position(zero_for_one)
     adjust_oracle(zero_for_one)  # makes position unsafe
 
-    reward = pool_initialized_with_liquidity.reward()
     position_id = pool_initialized_with_liquidity.state().totalPositions - 1
     key = get_position_key(manager.address, position_id)
     position = pool_initialized_with_liquidity.positions(key)
 
-    rewards = position_lib.liquidationRewards(position.size, reward)
+    rewards = position.rewards
 
     deadline = chain.pending_timestamp + 3600
     grab_params = (
@@ -243,6 +249,7 @@ def test_manager_grab__emits_grab(
 
     event = events[0]
     assert event.tokenId == token_id
+    assert event.recipient == alice.address
     assert event.rewards == rewards
     # assert tx.return_value == rewards  # TODO: fix
 

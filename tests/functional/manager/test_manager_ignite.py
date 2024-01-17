@@ -9,12 +9,15 @@ from utils.constants import (
     MAINTENANCE_UNIT,
     FUNDING_PERIOD,
     TICK_CUMULATIVE_RATE_MAX,
+    BASE_FEE_MIN,
+    GAS_LIQUIDATE,
 )
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
 
 
 @pytest.fixture
 def spot_pool_initialized_with_liquidity(
+    pool_initialized_with_liquidity,
     mock_univ3_pool,
     spot_liquidity,
     sqrt_price_x96_initial,
@@ -24,7 +27,7 @@ def spot_pool_initialized_with_liquidity(
 ):
     slot0 = mock_univ3_pool.slot0()
     slot0.sqrtPriceX96 = (
-        sqrt_price_x96_initial  # have prices coincide between spot and marginal
+        pool_initialized_with_liquidity.state().sqrtPriceX96  # have prices coincide between spot and marginal
     )
     mock_univ3_pool.setSlot0(slot0, sender=sender)
 
@@ -42,6 +45,7 @@ def spot_pool_initialized_with_liquidity(
 def mint_position(
     pool_initialized_with_liquidity,
     spot_pool_initialized_with_liquidity,
+    position_lib,
     chain,
     manager,
     sender,
@@ -81,7 +85,17 @@ def mint_position(
             sender.address,
             deadline,
         )
-        tx = manager.mint(mint_params, sender=sender)
+
+        premium = pool_initialized_with_liquidity.rewardPremium()
+        base_fee = chain.blocks[-1].base_fee
+        rewards = position_lib.liquidationRewards(
+            base_fee,
+            BASE_FEE_MIN,
+            GAS_LIQUIDATE,
+            premium,
+        )
+
+        tx = manager.mint(mint_params, sender=sender, value=rewards)
         token_id = tx.decode_logs(manager.Mint)[0].tokenId
         return int(token_id)
 
@@ -156,8 +170,6 @@ def test_manager_ignite__transfers_funds(
     mint_position,
 ):
     token_id = mint_position(zero_for_one)
-
-    reward = pool_initialized_with_liquidity.reward()
     position_id = pool_initialized_with_liquidity.state().totalPositions - 1
 
     spot_slot0 = spot_pool_initialized_with_liquidity.slot0()
@@ -166,7 +178,7 @@ def test_manager_ignite__transfers_funds(
 
     key = get_position_key(manager.address, position_id)
     position = pool_initialized_with_liquidity.positions(key)
-    rewards = position_lib.liquidationRewards(position.size, reward)
+    rewards = position.rewards
 
     token_in = token0 if zero_for_one else token1
     token_out = token1 if zero_for_one else token0
@@ -174,7 +186,7 @@ def test_manager_ignite__transfers_funds(
     amount_in = (
         position.debt0 if zero_for_one else position.debt1
     )  # out from spot pool to repay
-    amount_out = position.size + position.margin + rewards
+    amount_out = position.size + position.margin
 
     # calculate amount out from spot pool to subtract from amount_out
     amount_specified = -amount_in
@@ -192,10 +204,10 @@ def test_manager_ignite__transfers_funds(
     )
     if zero_for_one:
         # zero debt into marginal means zero taken out of spot pool to repay (1 into spot)
-        spot_amount1 += swap_math_lib.swapFees(spot_amount1, spot_fee)
+        spot_amount1 += swap_math_lib.swapFees(spot_amount1, spot_fee, True)
     else:
         # one debt into marginal means one taken out of spot pool to repay (0 into spot)
-        spot_amount0 += swap_math_lib.swapFees(spot_amount0, spot_fee)
+        spot_amount0 += swap_math_lib.swapFees(spot_amount0, spot_fee, True)
 
     spot_amount_in = spot_amount1 if zero_for_one else spot_amount0
 
@@ -213,6 +225,9 @@ def test_manager_ignite__transfers_funds(
     balance_in_spot_pool = token_in.balanceOf(
         spot_pool_initialized_with_liquidity.address
     )
+
+    balancee_alice = alice.balance
+    balancee_pool = pool_initialized_with_liquidity.balance
 
     deadline = chain.pending_timestamp + 3600
     amount_out_min = 0
@@ -248,6 +263,8 @@ def test_manager_ignite__transfers_funds(
         token_in.balanceOf(spot_pool_initialized_with_liquidity.address)
         == balance_in_spot_pool - amount_in
     )
+    assert alice.balance == balancee_alice + rewards
+    assert pool_initialized_with_liquidity.balance == balancee_pool - rewards
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
@@ -336,8 +353,6 @@ def test_manager_ignite__emits_ignite(
     mint_position,
 ):
     token_id = mint_position(zero_for_one)
-
-    reward = pool_initialized_with_liquidity.reward()
     position_id = pool_initialized_with_liquidity.state().totalPositions - 1
 
     spot_slot0 = spot_pool_initialized_with_liquidity.slot0()
@@ -346,12 +361,12 @@ def test_manager_ignite__emits_ignite(
 
     key = get_position_key(manager.address, position_id)
     position = pool_initialized_with_liquidity.positions(key)
-    rewards = position_lib.liquidationRewards(position.size, reward)
+    rewards = position.rewards
 
     amount_in = (
         position.debt0 if zero_for_one else position.debt1
     )  # out from spot pool to repay
-    amount_out = position.size + position.margin + rewards
+    amount_out = position.size + position.margin
 
     # calculate amount out from spot pool to subtract from amount_out
     amount_specified = -amount_in
@@ -369,10 +384,10 @@ def test_manager_ignite__emits_ignite(
     )
     if zero_for_one:
         # zero debt into marginal means zero taken out of spot pool to repay (1 into spot)
-        spot_amount1 += swap_math_lib.swapFees(spot_amount1, spot_fee)
+        spot_amount1 += swap_math_lib.swapFees(spot_amount1, spot_fee, True)
     else:
         # one debt into marginal means one taken out of spot pool to repay (0 into spot)
-        spot_amount0 += swap_math_lib.swapFees(spot_amount0, spot_fee)
+        spot_amount0 += swap_math_lib.swapFees(spot_amount0, spot_fee, True)
 
     spot_amount_in = spot_amount1 if zero_for_one else spot_amount0
 
@@ -398,7 +413,9 @@ def test_manager_ignite__emits_ignite(
 
     event = events[0]
     assert event.tokenId == token_id
+    assert event.recipient == alice.address
     assert event.amountOut == amount_out_recipient
+    assert event.rewards == rewards
     # assert tx.return_value == amount_out_recipient  # TODO: fix
 
 
@@ -509,8 +526,6 @@ def test_manager_ignite__reverts_when_amount_less_than_min(
     mint_position,
 ):
     token_id = mint_position(zero_for_one)
-
-    reward = pool_initialized_with_liquidity.reward()
     position_id = pool_initialized_with_liquidity.state().totalPositions - 1
 
     spot_slot0 = spot_pool_initialized_with_liquidity.slot0()
@@ -519,12 +534,11 @@ def test_manager_ignite__reverts_when_amount_less_than_min(
 
     key = get_position_key(manager.address, position_id)
     position = pool_initialized_with_liquidity.positions(key)
-    rewards = position_lib.liquidationRewards(position.size, reward)
 
     amount_in = (
         position.debt0 if zero_for_one else position.debt1
     )  # out from spot pool to repay
-    amount_out = position.size + position.margin + rewards
+    amount_out = position.size + position.margin
 
     # calculate amount out from spot pool to subtract from amount_out
     amount_specified = -amount_in
@@ -542,10 +556,10 @@ def test_manager_ignite__reverts_when_amount_less_than_min(
     )
     if zero_for_one:
         # zero debt into marginal means zero taken out of spot pool to repay (1 into spot)
-        spot_amount1 += swap_math_lib.swapFees(spot_amount1, spot_fee)
+        spot_amount1 += swap_math_lib.swapFees(spot_amount1, spot_fee, True)
     else:
         # one debt into marginal means one taken out of spot pool to repay (0 into spot)
-        spot_amount0 += swap_math_lib.swapFees(spot_amount0, spot_fee)
+        spot_amount0 += swap_math_lib.swapFees(spot_amount0, spot_fee, True)
 
     spot_amount_in = spot_amount1 if zero_for_one else spot_amount0
 
