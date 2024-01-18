@@ -13,7 +13,6 @@ interface IQuoter {
     /// @return margin Amount of margin token in required to open position
     /// @return safeMarginMinimum The minimum margin requirements necessary to open position on pool while also being safe from liquidation
     /// @return fees Amount of fees in margin token paid to open the position
-    /// @return rewards Amount of liquidation rewards in native (gas) token required to escrow to open the position
     /// @return safe Whether the position will be safe given current oracle price averaged over seconds ago
     /// @return liquidityAfter Pool liquidity after mint
     /// @return sqrtPriceX96After Pool sqrt price after mint
@@ -28,10 +27,10 @@ interface IQuoter {
             uint256 margin,
             uint256 safeMarginMinimum,
             uint256 fees,
-            uint256 rewards,
             bool safe,
             uint128 liquidityAfter,
-            uint160 sqrtPriceX96After
+            uint160 sqrtPriceX96After,
+            uint128 liquidityLockedAfter
         );
 
     /// @notice Quotes the amountOut result of Router::exactInputSingle

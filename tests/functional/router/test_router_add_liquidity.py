@@ -250,6 +250,40 @@ def test_router_add_liquidity__reverts_when_past_deadline(
         router.addLiquidity(params, sender=sender)
 
 
+def test_router_add_liquidity__reverts_when_pool_not_initialized(
+    pool_two,
+    router,
+    sender,
+    alice,
+    chain,
+    spot_reserve0,
+    spot_reserve1,
+):
+    state = pool_two.state()
+    assert state.initialized is False
+
+    amount0_desired = spot_reserve0 * 1 // 100
+    amount1_desired = spot_reserve1 * 1 // 100
+    amount0_min = 0
+    amount1_min = 0
+    deadline = chain.pending_timestamp + 3600
+    params = (
+        pool_two.token0(),
+        pool_two.token1(),
+        pool_two.maintenance(),
+        pool_two.oracle(),
+        alice.address,
+        amount0_desired,
+        amount1_desired,
+        amount0_min,
+        amount1_min,
+        deadline,
+    )
+
+    with reverts("Pool not initialized"):
+        router.addLiquidity(params, sender=sender)
+
+
 def test_router_add_liquidity__reverts_when_amount0_less_than_min(
     pool_initialized_with_liquidity,
     router,

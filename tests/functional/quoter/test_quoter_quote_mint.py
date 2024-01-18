@@ -5,8 +5,9 @@ from utils.constants import (
     MAX_SQRT_RATIO,
     MAINTENANCE_UNIT,
     FEE,
-    REWARD,
     SECONDS_AGO,
+    BASE_FEE_MIN,
+    GAS_LIQUIDATE,
 )
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
 
@@ -71,7 +72,15 @@ def test_quoter_quote_mint__quotes_mint(
     result = quoter.quoteMint(mint_params)
 
     # actually mint and check result same as quote
-    manager.mint(mint_params, sender=sender)
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    value = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+    manager.mint(mint_params, sender=sender, value=value)
 
     id = 0  # starts at 0 for pool
     next_id = 1  # starts at 1 for nft position manager
@@ -82,13 +91,15 @@ def test_quoter_quote_mint__quotes_mint(
     assert result.safe is True
 
     fees = position_lib.fees(position.size, FEE)
-    rewards = position_lib.liquidationRewards(position.size, REWARD)
-    amount_in = position.margin + rewards + fees
-    assert result.amountIn == amount_in
+    assert result.fees == fees
+    assert result.margin == position.margin
 
     state = pool_initialized_with_liquidity.state()
     assert result.liquidityAfter == state.liquidity
     assert result.sqrtPriceX96After == state.sqrtPriceX96
+
+    liquidity_locked = pool_initialized_with_liquidity.liquidityLocked()
+    assert result.liquidityLockedAfter == liquidity_locked
 
     key = get_position_key(manager.address, id)
     info = pool_initialized_with_liquidity.positions(key)
@@ -154,7 +165,15 @@ def test_quoter_quote_mint__quotes_mint_with_oracle_tick_near_liquidation(
     result = quoter.quoteMint(mint_params)
 
     # actually mint and check result same as quote
-    manager.mint(mint_params, sender=sender)
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    value = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+    manager.mint(mint_params, sender=sender, value=value)
 
     id = 0  # starts at 0 for pool ID
     key = get_position_key(manager.address, id)

@@ -329,12 +329,14 @@ contract Router is
         checkDeadline(params.deadline)
         returns (uint256 shares, uint256 amount0, uint256 amount1)
     {
-        (uint160 sqrtPriceX96, , , , , , , ) = getPool(
+        (uint160 sqrtPriceX96, , , , , , , bool initialized) = getPool(
             params.token0,
             params.token1,
             params.maintenance,
             params.oracle
         ).state();
+        require(initialized, "Pool not initialized");
+
         uint128 liquidityDelta = LiquidityAmounts.getLiquidityForAmounts(
             sqrtPriceX96,
             params.amount0Desired,

@@ -58,10 +58,10 @@ contract Quoter is
             uint256 margin,
             uint256 safeMarginMinimum,
             uint256 fees,
-            uint256 rewards,
             bool safe,
             uint128 liquidityAfter,
-            uint160 sqrtPriceX96After
+            uint160 sqrtPriceX96After,
+            uint128 liquidityLockedAfter
         )
     {
         IMarginalV1Pool pool = getPool(
@@ -92,8 +92,10 @@ contract Quoter is
             params.zeroForOne,
             params.sizeDesired
         );
-        if (liquidityDelta == 0 || liquidityDelta >= liquidity)
-            revert("Invalid liquidityDelta");
+        if (
+            liquidityDelta == 0 ||
+            liquidityDelta + PoolConstants.MINIMUM_LIQUIDITY >= liquidity
+        ) revert("Invalid liquidityDelta");
 
         uint160 sqrtPriceLimitX96 = params.sqrtPriceLimitX96 == 0
             ? (
@@ -144,8 +146,11 @@ contract Quoter is
             0
         );
         if (
-            position.size == 0 ||
-            (params.zeroForOne ? position.debt0 == 0 : position.debt1 == 0)
+            position.size < PoolConstants.MINIMUM_SIZE ||
+            position.debt0 < PoolConstants.MINIMUM_SIZE ||
+            position.debt1 < PoolConstants.MINIMUM_SIZE ||
+            position.insurance0 < PoolConstants.MINIMUM_SIZE ||
+            position.insurance1 < PoolConstants.MINIMUM_SIZE
         ) revert("Invalid position");
 
         uint128 marginMinimum = PositionLibrary.marginMinimum(
@@ -164,12 +169,6 @@ contract Quoter is
 
         margin = params.margin;
         fees = PositionLibrary.fees(position.size, PoolConstants.fee);
-        rewards = PositionLibrary.liquidationRewards(
-            block.basefee,
-            PoolConstants.blockBaseFeeMin,
-            PoolConstants.gasLiquidate,
-            PoolConstants.rewardPremium
-        );
 
         uint256 amountIn = margin + fees;
         if (amountIn > amountInMaximum) revert("amountIn greater than max");
@@ -185,6 +184,9 @@ contract Quoter is
                 !params.zeroForOne ? int256(_fees) : int256(0),
                 !params.zeroForOne ? int256(0) : int256(_fees)
             );
+
+        uint128 liquidityLocked = pool.liquidityLocked();
+        liquidityLockedAfter = liquidityLocked + liquidityDelta;
 
         // check whether position would be safe after open given twap oracle lag
         {
@@ -370,6 +372,8 @@ contract Quoter is
         if (amountOut < params.amountOutMinimum) revert("Too little received");
     }
 
+    // TODO: quote settle/ignite
+
     /// @inheritdoc IQuoter
     function quoteExactOutputSingle(
         IRouter.ExactOutputSingleParams memory params
@@ -549,7 +553,6 @@ contract Quoter is
             })
         );
 
-        // TODO: account for initialize on first mint
         (
             uint160 sqrtPriceX96,
             ,
@@ -560,7 +563,7 @@ contract Quoter is
             ,
             bool initialized
         ) = pool.state();
-        if (!initialized) revert("Not initialized");
+        if (!initialized) revert("Pool not initialized");
 
         uint128 liquidityDelta = LiquidityAmounts.getLiquidityForAmounts(
             sqrtPriceX96,

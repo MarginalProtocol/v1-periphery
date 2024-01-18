@@ -15,7 +15,6 @@ from utils.utils import (
 @pytest.fixture
 def pool_two_initialized_with_liquidity(
     pool_two,
-    sqrt_price_x96_initial,
     spot_liquidity,
     callee,
     router,

@@ -4,6 +4,8 @@ from utils.constants import (
     MIN_SQRT_RATIO,
     MAX_SQRT_RATIO,
     MAINTENANCE_UNIT,
+    BASE_FEE_MIN,
+    GAS_LIQUIDATE,
 )
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96
 
@@ -74,6 +76,7 @@ def test_quoter_quote_remove_liquidity__quotes_liquidity_remove_when_liquidity_l
     token0,
     token1,
     liquidity_math_lib,
+    position_lib,
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
@@ -108,7 +111,15 @@ def test_quoter_quote_remove_liquidity__quotes_liquidity_remove_when_liquidity_l
         sender.address,
         deadline,
     )
-    manager.mint(mint_params, sender=sender)
+    premium = pool_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    value = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+    manager.mint(mint_params, sender=sender, value=value)
     assert pool_initialized_with_liquidity.state().totalPositions > 0
 
     # now quote remove liquidity

@@ -3,13 +3,14 @@ from math import sqrt
 
 from hexbytes import HexBytes
 from eth_abi.packed import encode_packed
+
+from utils.constants import MIN_SQRT_RATIO
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96
 
 
 @pytest.fixture
 def pool_two_initialized_with_liquidity(
     pool_two,
-    sqrt_price_x96_initial,
     spot_liquidity,
     callee,
     router,
@@ -17,15 +18,28 @@ def pool_two_initialized_with_liquidity(
     token1,
     sender,
 ):
-    # initialize with price 10% lower than original pool for arb tests
-    sqrt_price_x96 = int(sqrt(0.9) * sqrt_price_x96_initial)
-    pool_two.initialize(sqrt_price_x96, sender=sender)
-
     # add liquidity
     liquidity_delta = spot_liquidity * 100 // 10000  # 1% of spot reserves
     callee.mint(pool_two.address, sender.address, liquidity_delta, sender=sender)
     pool_two.approve(pool_two.address, 2**256 - 1, sender=sender)
     pool_two.approve(router.address, 2**256 - 1, sender=sender)
+
+    # initialize with price 10% lower than original pool for arb tests
+    # by swapping through the pool
+    state = pool_two.state()
+    reserve0, reserve1 = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    amount1 = int(reserve1 * (sqrt(0.9) - 1))  # specified one out
+    callee.swap(
+        pool_two.address,
+        sender.address,
+        True,
+        amount1,
+        MIN_SQRT_RATIO + 1,
+        sender=sender,
+    )
+
     return pool_two
 
 
