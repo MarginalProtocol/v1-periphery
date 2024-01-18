@@ -195,7 +195,7 @@ contract NonfungiblePositionManager is
             id: uint96(positionId)
         });
 
-        // sweep any excess ETH from escrowed rewards to sender at end of function given callback
+        // sweep any excess ETH from escrowed rewards to sender at end of function to avoid re-entrancy with fallback
         sweepETH(_balance - rewards, msg.sender);
 
         emit Mint(tokenId, params.recipient, size, debt, margin, fees, rewards);
@@ -375,7 +375,7 @@ contract NonfungiblePositionManager is
 
         _burn(params.tokenId);
 
-        // sweep escrowed ETH rewards to recipient at end of function given callback
+        // sweep escrowed ETH rewards to recipient at end of function to avoid re-entrancy with fallback
         sweepETH(rewards, params.recipient);
 
         emit Ignite(params.tokenId, params.recipient, amountOut, rewards);

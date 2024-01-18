@@ -4,6 +4,8 @@ from ape import reverts
 from eth_abi.packed import encode_packed
 from hexbytes import HexBytes
 from math import sqrt
+
+from utils.constants import MIN_SQRT_RATIO
 from utils.utils import (
     calc_amounts_from_liquidity_sqrt_price_x96,
     calc_tick_from_sqrt_price_x96,
@@ -13,7 +15,6 @@ from utils.utils import (
 @pytest.fixture
 def pool_two_initialized_with_liquidity(
     pool_two,
-    sqrt_price_x96_initial,
     spot_liquidity,
     callee,
     router,
@@ -21,15 +22,28 @@ def pool_two_initialized_with_liquidity(
     token1,
     sender,
 ):
-    # initialize with price 10% lower than original pool for arb tests
-    sqrt_price_x96 = int(sqrt(0.9) * sqrt_price_x96_initial)
-    pool_two.initialize(sqrt_price_x96, sender=sender)
-
     # add liquidity
     liquidity_delta = spot_liquidity * 100 // 10000  # 1% of spot reserves
     callee.mint(pool_two.address, sender.address, liquidity_delta, sender=sender)
     pool_two.approve(pool_two.address, 2**256 - 1, sender=sender)
     pool_two.approve(router.address, 2**256 - 1, sender=sender)
+
+    # initialize with price 10% lower than original pool for arb tests
+    # by swapping through the pool
+    state = pool_two.state()
+    reserve0, reserve1 = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    amount1 = int(reserve1 * (sqrt(0.9) - 1))  # specified one out
+    callee.swap(
+        pool_two.address,
+        sender.address,
+        True,
+        amount1,
+        MIN_SQRT_RATIO + 1,
+        sender=sender,
+    )
+
     return pool_two
 
 
@@ -104,7 +118,7 @@ def test_router_exact_input__updates_states(
     router.exactInput(params, sender=sender)
 
     # calculate amount out from pool 1 to be used as amount in to pool 2
-    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee)
+    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee, False)
     sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextSwap(
         state.liquidity,
         state.sqrtPriceX96,
@@ -138,7 +152,7 @@ def test_router_exact_input__updates_states(
     # calculate amount out from pool 2
     amount_in_two = amount_out
     amount_in_two_less_fee = amount_in_two - swap_math_lib.swapFees(
-        amount_in_two, fee_two
+        amount_in_two, fee_two, False
     )
     sqrt_price_x96_next_two = sqrt_price_math_lib.sqrtPriceX96NextSwap(
         state_two.liquidity,
@@ -220,7 +234,7 @@ def test_router_exact_input__transfers_funds(
     router.exactInput(params, sender=sender)
 
     # calculate amount out from pool 1 to be used as amount in to pool 2
-    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee)
+    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee, False)
     sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextSwap(
         state.liquidity,
         state.sqrtPriceX96,
@@ -250,7 +264,7 @@ def test_router_exact_input__transfers_funds(
     # calculate amount out from pool 2
     amount_in_two = amount_out
     amount_in_two_less_fee = amount_in_two - swap_math_lib.swapFees(
-        amount_in_two, fee_two
+        amount_in_two, fee_two, False
     )
     sqrt_price_x96_next_two = sqrt_price_math_lib.sqrtPriceX96NextSwap(
         state_two.liquidity,
@@ -344,7 +358,7 @@ def test_router_exact_input__returns_amount_out(
     tx = router.exactInput(params, sender=sender)
 
     # calculate amount out from pool 1 to be used as amount in to pool 2
-    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee)
+    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee, False)
     sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextSwap(
         state.liquidity,
         state.sqrtPriceX96,
@@ -360,7 +374,7 @@ def test_router_exact_input__returns_amount_out(
     # calculate amount out from pool 2
     amount_in_two = amount_out
     amount_in_two_less_fee = amount_in_two - swap_math_lib.swapFees(
-        amount_in_two, fee_two
+        amount_in_two, fee_two, False
     )
     sqrt_price_x96_next_two = sqrt_price_math_lib.sqrtPriceX96NextSwap(
         state_two.liquidity,
@@ -441,7 +455,7 @@ def test_router_exact_input__reverts_when_amount_out_less_than_min(
     amount_in = 1 * reserve0 // 100 if zero_for_one else 1 * reserve1 // 100
 
     # calculate amount out from pool 1 to be used as amount in to pool 2
-    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee)
+    amount_in_less_fee = amount_in - swap_math_lib.swapFees(amount_in, fee, False)
     sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextSwap(
         state.liquidity,
         state.sqrtPriceX96,
@@ -457,7 +471,7 @@ def test_router_exact_input__reverts_when_amount_out_less_than_min(
     # calculate amount out from pool 2
     amount_in_two = amount_out
     amount_in_two_less_fee = amount_in_two - swap_math_lib.swapFees(
-        amount_in_two, fee_two
+        amount_in_two, fee_two, False
     )
     sqrt_price_x96_next_two = sqrt_price_math_lib.sqrtPriceX96NextSwap(
         state_two.liquidity,

@@ -4,6 +4,8 @@ from ape import reverts
 from eth_abi.packed import encode_packed
 from hexbytes import HexBytes
 from math import sqrt
+
+from utils.constants import MIN_SQRT_RATIO
 from utils.utils import (
     calc_amounts_from_liquidity_sqrt_price_x96,
     calc_tick_from_sqrt_price_x96,
@@ -21,15 +23,28 @@ def pool_two_initialized_with_liquidity(
     token1,
     sender,
 ):
-    # initialize with price 10% lower than original pool for arb tests
-    sqrt_price_x96 = int(sqrt(0.9) * sqrt_price_x96_initial)
-    pool_two.initialize(sqrt_price_x96, sender=sender)
-
     # add liquidity
     liquidity_delta = spot_liquidity * 100 // 10000  # 1% of spot reserves
     callee.mint(pool_two.address, sender.address, liquidity_delta, sender=sender)
     pool_two.approve(pool_two.address, 2**256 - 1, sender=sender)
     pool_two.approve(router.address, 2**256 - 1, sender=sender)
+
+    # initialize with price 10% lower than original pool for arb tests
+    # by swapping through the pool
+    state = pool_two.state()
+    reserve0, reserve1 = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    amount1 = int(reserve1 * (sqrt(0.9) - 1))  # specified one out
+    callee.swap(
+        pool_two.address,
+        sender.address,
+        True,
+        amount1,
+        MIN_SQRT_RATIO + 1,
+        sender=sender,
+    )
+
     return pool_two
 
 
@@ -116,10 +131,10 @@ def test_router_exact_output__updates_states(
 
     # factor in fees
     if not zero_for_one:
-        fees0 = swap_math_lib.swapFees(amount0, fee)
+        fees0 = swap_math_lib.swapFees(amount0, fee, True)
         amount0 += fees0
     else:
-        fees1 = swap_math_lib.swapFees(amount1, fee)
+        fees1 = swap_math_lib.swapFees(amount1, fee, True)
         amount1 += fees1
 
     # determine liquidity, sqrtPriceX96 after
@@ -156,10 +171,10 @@ def test_router_exact_output__updates_states(
 
     # factor in fees
     if zero_for_one:
-        fees0_two = swap_math_lib.swapFees(amount0_two, fee_two)
+        fees0_two = swap_math_lib.swapFees(amount0_two, fee_two, True)
         amount0_two += fees0_two
     else:
-        fees1_two = swap_math_lib.swapFees(amount1_two, fee_two)
+        fees1_two = swap_math_lib.swapFees(amount1_two, fee_two, True)
         amount1_two += fees1_two
 
     # determine liquidity, sqrtPriceX96 after
@@ -247,10 +262,10 @@ def test_router_exact_output__transfers_funds(
 
     # factor in fees
     if not zero_for_one:
-        fees0 = swap_math_lib.swapFees(amount0, fee)
+        fees0 = swap_math_lib.swapFees(amount0, fee, True)
         amount0 += fees0
     else:
-        fees1 = swap_math_lib.swapFees(amount1, fee)
+        fees1 = swap_math_lib.swapFees(amount1, fee, True)
         amount1 += fees1
 
     # calculate amount in from pool 2
@@ -270,10 +285,10 @@ def test_router_exact_output__transfers_funds(
 
     # factor in fees
     if zero_for_one:
-        fees0_two = swap_math_lib.swapFees(amount0_two, fee_two)
+        fees0_two = swap_math_lib.swapFees(amount0_two, fee_two, True)
         amount0_two += fees0_two
     else:
-        fees1_two = swap_math_lib.swapFees(amount1_two, fee_two)
+        fees1_two = swap_math_lib.swapFees(amount1_two, fee_two, True)
         amount1_two += fees1_two
 
     amount_in_two = amount0_two if zero_for_one else amount1_two
@@ -429,10 +444,10 @@ def test_router_exact_output__reverts_when_amount_in_greater_than_max(
 
     # factor in fees
     if not zero_for_one:
-        fees0 = swap_math_lib.swapFees(amount0, fee)
+        fees0 = swap_math_lib.swapFees(amount0, fee, True)
         amount0 += fees0
     else:
-        fees1 = swap_math_lib.swapFees(amount1, fee)
+        fees1 = swap_math_lib.swapFees(amount1, fee, True)
         amount1 += fees1
 
     # calculate amount in from pool 2
@@ -451,10 +466,10 @@ def test_router_exact_output__reverts_when_amount_in_greater_than_max(
 
     # factor in fees
     if zero_for_one:
-        fees0_two = swap_math_lib.swapFees(amount0_two, fee_two)
+        fees0_two = swap_math_lib.swapFees(amount0_two, fee_two, True)
         amount0_two += fees0_two
     else:
-        fees1_two = swap_math_lib.swapFees(amount1_two, fee_two)
+        fees1_two = swap_math_lib.swapFees(amount1_two, fee_two, True)
         amount1_two += fees1_two
 
     amount_in_two = amount0_two if zero_for_one else amount1_two
