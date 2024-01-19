@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity =0.8.15;
 
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
@@ -23,8 +23,6 @@ import {PoolConstants} from "./libraries/PoolConstants.sol";
 
 import {IPoolInitializer} from "./interfaces/IPoolInitializer.sol";
 
-/// @title Creates and initializes V1 Pools
-/// @dev Fork of Uniswap V3 periphery PoolInitializer.sol, adapted to Marginal V1
 contract PoolInitializer is
     IPoolInitializer,
     IMarginalV1SwapCallback,

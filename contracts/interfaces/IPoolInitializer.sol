@@ -1,10 +1,8 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.7.5;
-pragma abicoder v2;
 
-/// @title Initializes Uniswap v3 oracles to prepare creation of Marginal v1 pools
-/// @notice Provides a method for initializing a Uniswap v3 oracle, if necessary, for bundling with other methods that
-/// require the Marginal v1 pool to exist.
+/// @title Interface for the Marginal v1 pool initializer
+/// @notice Provides methods for preparing, creating and initializing a Marginal v1 pool
 interface IPoolInitializer {
     struct CreateAndInitializeParams {
         address token0;
