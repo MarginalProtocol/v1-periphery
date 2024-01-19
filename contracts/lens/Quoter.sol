@@ -3,6 +3,7 @@ pragma solidity =0.8.15;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {Multicall} from "@uniswap/v3-periphery/contracts/base/Multicall.sol";
 import {PeripheryValidation} from "@uniswap/v3-periphery/contracts/base/PeripheryValidation.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
@@ -29,7 +30,8 @@ contract Quoter is
     IQuoter,
     PeripheryImmutableState,
     PeripheryValidation,
-    PositionState
+    PositionState,
+    Multicall // TODO: test
 {
     using Path for bytes;
 

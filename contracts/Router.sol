@@ -15,12 +15,12 @@ import {PeripheryValidation} from "@uniswap/v3-periphery/contracts/base/Peripher
 import {Multicall} from "@uniswap/v3-periphery/contracts/base/Multicall.sol";
 import {SelfPermit} from "@uniswap/v3-periphery/contracts/base/SelfPermit.sol";
 
+import {IMarginalV1SwapCallback} from "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1SwapCallback.sol";
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
 
 import {IRouter} from "./interfaces/IRouter.sol";
 import {LiquidityManagement} from "./base/LiquidityManagement.sol";
 import {PeripheryImmutableState} from "./base/PeripheryImmutableState.sol";
-import {PoolInitializer} from "./base/PoolInitializer.sol";
 
 import {CallbackValidation} from "./libraries/CallbackValidation.sol";
 import {LiquidityAmounts} from "./libraries/LiquidityAmounts.sol";
@@ -29,9 +29,9 @@ import {PoolAddress} from "./libraries/PoolAddress.sol";
 
 contract Router is
     IRouter,
+    IMarginalV1SwapCallback,
     PeripheryImmutableState,
     LiquidityManagement,
-    PoolInitializer,
     PeripheryValidation,
     Multicall,
     SelfPermit
@@ -72,6 +72,7 @@ contract Router is
         address payer;
     }
 
+    /// @inheritdoc IMarginalV1SwapCallback
     function marginalV1SwapCallback(
         int256 amount0Delta,
         int256 amount1Delta,

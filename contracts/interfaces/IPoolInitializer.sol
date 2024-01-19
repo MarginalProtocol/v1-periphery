@@ -6,18 +6,70 @@ pragma abicoder v2;
 /// @notice Provides a method for initializing a Uniswap v3 oracle, if necessary, for bundling with other methods that
 /// require the Marginal v1 pool to exist.
 interface IPoolInitializer {
+    struct CreateAndInitializeParams {
+        address token0;
+        address token1;
+        uint24 maintenance;
+        uint24 uniswapV3Fee;
+        address recipient;
+        uint160 sqrtPriceX96;
+        uint160 sqrtPriceLimitX96;
+        uint256 amount0BurnedMax;
+        uint256 amount1BurnedMax;
+        uint256 amount0Desired;
+        uint256 amount1Desired;
+        uint256 amount0Min;
+        uint256 amount1Min;
+        uint256 deadline;
+    }
+
+    /// @notice Creates a new pool if it does not exist, then initializes if not initialized
+    /// @param params The parameters necessary to create and initialize a pool, encoded as `CreateAndInitializeParams` in calldata
+    /// @return pool Returns the pool address based on the pair of tokens, Uniswap v3 fee, and maintenance, will return the newly created pool address if necessary
+    /// @return shares The amount of shares minted to `params.recipient` after initializing pool with liquidity
+    /// @return amount0 The amount of the input token0 to create and initialize pool
+    /// @return amount1 The amount of the input token1 to create and initialize pool
+    function createAndInitializePoolIfNecessary(
+        CreateAndInitializeParams calldata params
+    )
+        external
+        payable
+        returns (address pool, uint256 shares, int256 amount0, int256 amount1);
+
+    struct InitializePoolSqrtPriceX96Params {
+        address token0;
+        address token1;
+        uint24 maintenance;
+        address oracle;
+        address recipient;
+        uint160 sqrtPriceX96;
+        uint256 amountInMaximum;
+        uint256 amountOutMinimum;
+        uint160 sqrtPriceLimitX96;
+        uint256 deadline;
+    }
+
+    /// @notice Swaps through pool to set the pool price
+    /// @dev Intended for pools with dust amounts of liquidity as otherwise amount in will be substantial
+    /// @param params The parameters necessary to initialize pool with `params.sqrtPriceX96`
+    /// @return amount0 The amount of the input token0 to set the price
+    /// @return amount1 The amount of the input token1 to set the price
+    function initializePoolSqrtPriceX96(
+        InitializePoolSqrtPriceX96Params memory params
+    ) external payable returns (int256 amount0, int256 amount1);
+
+    struct InitializeOracleParams {
+        address token0;
+        address token1;
+        uint24 maintenance;
+        uint24 uniswapV3Fee;
+        uint16 observationCardinalityNext;
+    }
+
     /// @notice Increases observationCardinalityNext on oracle Uniswap v3 pool, if necessary, to prepare for Marginal v1 pool creation.
     /// @dev There will be a time lag between increasing observationCardinalityNext on the oracle pool and when observationCardinality on slot0 changes.
-    /// @param token0 The contract address of token0 of the pool
-    /// @param token1 The contract address of token1 of the pool
-    /// @param maintenance The maintenance amount of the Marginal v1 pool for the specified token pair
-    /// @param uniswapV3Fee The fee amount of the Uniswap v3 pool for the specified token pair used as the oracle reference
-    /// @param observationCardinalityNext The next observation cardinality of the Uniswap v3 pool for the specified token pair
+    /// @param params The parameters necessary to initialize oracle for pool, encoded as `InitializeOracleParams` in calldata
     function initializeOracleIfNecessary(
-        address token0,
-        address token1,
-        uint24 maintenance,
-        uint24 uniswapV3Fee,
-        uint16 observationCardinalityNext
+        InitializeOracleParams calldata params
     ) external;
 }
