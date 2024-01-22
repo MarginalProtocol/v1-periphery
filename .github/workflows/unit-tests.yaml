@@ -9,6 +9,8 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v1
       - uses: ApeWorX/github-action@v2.0
@@ -29,10 +31,5 @@ jobs:
           version: nightly
 
       - name: Run tests
-        run: ape test -s -m "not fuzzing and not integration" --coverage
+        run: ape test -s -m "not fuzzing and not integration" --cache-clear
         timeout-minutes: 15
-
-      # TODO: uncomment in separate workflow when fuzz node issues fixed
-      # - name: Run fuzz tests
-      #   run: ape test -s -m "fuzzing"
-      #   timeout-minutes: 15
