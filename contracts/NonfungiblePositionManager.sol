@@ -158,7 +158,6 @@ contract NonfungiblePositionManager is
             params.sizeDesired
         );
 
-        uint256 _balance = address(this).balance;
         uint256 positionId;
         (positionId, size, debt, margin, fees, rewards) = open(
             OpenParams({
@@ -196,7 +195,7 @@ contract NonfungiblePositionManager is
         });
 
         // sweep any excess ETH from escrowed rewards to sender at end of function to avoid re-entrancy with fallback
-        sweepETH(_balance - rewards, msg.sender);
+        sweepETH(0, msg.sender);
 
         emit Mint(tokenId, params.recipient, size, debt, margin, fees, rewards);
     }
