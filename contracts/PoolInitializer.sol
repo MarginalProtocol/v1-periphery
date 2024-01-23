@@ -217,7 +217,8 @@ contract PoolInitializer is
         ) = IMarginalV1Pool(pool).state();
         if (!initialized) revert PoolNotInitialized();
 
-        // calculate amount in needed (including fees) to get pool price to sqrtPriceX96Desired
+        // calculate amount in needed (including fees) to get pool price to sqrtPriceX96 desired
+        // @dev ignores fee add to liquidity effect on price for simplicity
         (int256 amount0Delta, int256 amount1Delta) = SwapMath.swapAmounts(
             liquidityExisting,
             sqrtPriceX96Existing,
@@ -232,7 +233,7 @@ contract PoolInitializer is
                 PoolConstants.fee,
                 false
             )
-        ); // ignores fee add to liquidity effect on price for simplicity TODO: fix for fees?
+        );
 
         uint256 amountInMaximum = params.amountInMaximum == 0
             ? type(uint256).max

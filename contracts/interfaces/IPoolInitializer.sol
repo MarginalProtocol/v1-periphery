@@ -50,6 +50,7 @@ interface IPoolInitializer {
 
     /// @notice Swaps through pool to set the pool price
     /// @dev Intended for pools with dust amounts of liquidity as otherwise amount in will be substantial
+    /// Ignores effect on pool price of adding fee to liquidity for simpmlicity. Results in difference of < 1 bps in practice vs desired price
     /// @param params The parameters necessary to initialize pool with `params.sqrtPriceX96`
     /// @return amount0 The amount of the input token0 to set the price
     /// @return amount1 The amount of the input token1 to set the price
