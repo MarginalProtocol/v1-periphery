@@ -12,6 +12,7 @@ interface IPoolInitializer {
         address recipient;
         uint160 sqrtPriceX96;
         uint160 sqrtPriceLimitX96;
+        uint128 liquidityBurned;
         uint256 amount0BurnedMax;
         uint256 amount1BurnedMax;
         uint256 amount0Desired;

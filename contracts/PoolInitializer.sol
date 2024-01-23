@@ -36,6 +36,7 @@ contract PoolInitializer is
     error PoolNotInitialized();
     error AmountInGreaterThanMax(uint256 amountIn);
     error AmountOutLessThanMin(uint256 amountOut);
+    error LiquidityBurnedLessThanMin();
     error Amount0BurnedGreaterThanMax(int256 amount0Burned);
     error Amount1BurnedGreaterThanMax(int256 amount1Burned);
 
@@ -114,6 +115,8 @@ contract PoolInitializer is
         // if not initialized, mint min liquidity with dust then swap to given price before adding full amount of liquidity
         (, , , , , , , bool initialized) = IMarginalV1Pool(pool).state();
         if (!initialized) {
+            if (params.liquidityBurned <= PoolConstants.MINIMUM_LIQUIDITY)
+                revert LiquidityBurnedLessThanMin();
             (, uint256 amount0BurnedOnMint, uint256 amount1BurnedOnMint) = mint(
                 MintParams({
                     token0: params.token0,
@@ -121,7 +124,7 @@ contract PoolInitializer is
                     maintenance: params.maintenance,
                     oracle: oracle,
                     recipient: pool,
-                    liquidityDelta: PoolConstants.MINIMUM_LIQUIDITY + 1, // burn 1 wei extra,
+                    liquidityDelta: params.liquidityBurned, // burn extra to pool in case need buffer on rounding for swap (amountDelta > 0)
                     amount0Min: 0,
                     amount1Min: 0
                 })
@@ -229,8 +232,12 @@ contract PoolInitializer is
                 PoolConstants.fee,
                 false
             )
-        );
-        if (uint256(amountSpecified) > params.amountInMaximum)
+        ); // ignores fee add to liquidity effect on price for simplicity TODO: fix for fees?
+
+        uint256 amountInMaximum = params.amountInMaximum == 0
+            ? type(uint256).max
+            : params.amountInMaximum;
+        if (uint256(amountSpecified) > amountInMaximum)
             revert AmountInGreaterThanMax(uint256(amountSpecified));
 
         SwapCallbackData memory data = SwapCallbackData({
