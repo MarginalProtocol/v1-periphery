@@ -51,3 +51,14 @@ def main():
             publish=publish,
         )
         click.echo(f"Deployed Marginal v1 quoter to {quoter.address}")
+
+    # deploy marginal v1 pool initializer
+    if click.confirm("Deploy Marginal v1 pool initializer?"):
+        click.echo("Deploying Marginal v1 pool initializer ...")
+        initializer = project.PoolInitializer.deploy(
+            factory_address,
+            weth9_address,
+            sender=deployer,
+            publish=publish,
+        )
+        click.echo(f"Deployed Marginal v1 pool initializer to {initializer.address}")
