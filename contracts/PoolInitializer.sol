@@ -32,6 +32,14 @@ contract PoolInitializer is
 {
     using Path for bytes;
 
+    event PoolInitialize(
+        address indexed sender,
+        address pool,
+        uint256 shares,
+        int256 amount0,
+        int256 amount1
+    );
+
     error InvalidOracle();
     error PoolNotInitialized();
     error AmountInGreaterThanMax(uint256 amountIn);
@@ -151,11 +159,11 @@ contract PoolInitializer is
             // check haven't burned more than want
             int256 amount0Burned = int256(amount0BurnedOnMint) +
                 amount0BurnedOnSwap;
-            if (amount0Burned > int256(params.amount0BurnedMax))
+            if (amount0Burned > params.amount0BurnedMax)
                 revert Amount0BurnedGreaterThanMax(amount0Burned);
             int256 amount1Burned = int256(amount1BurnedOnMint) +
                 amount1BurnedOnSwap;
-            if (amount1Burned > int256(params.amount1BurnedMax))
+            if (amount1Burned > params.amount1BurnedMax)
                 revert Amount1BurnedGreaterThanMax(amount1Burned);
 
             uint128 liquidityDelta = LiquidityAmounts.getLiquidityForAmounts(
@@ -181,6 +189,8 @@ contract PoolInitializer is
 
             amount0 = int256(_amount0) + amount0Burned;
             amount1 = int256(_amount1) + amount1Burned;
+
+            emit PoolInitialize(msg.sender, pool, shares, amount0, amount1);
         }
     }
 

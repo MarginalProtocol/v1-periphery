@@ -13,8 +13,8 @@ interface IPoolInitializer {
         uint160 sqrtPriceX96;
         uint160 sqrtPriceLimitX96;
         uint128 liquidityBurned;
-        uint256 amount0BurnedMax;
-        uint256 amount1BurnedMax;
+        int256 amount0BurnedMax;
+        int256 amount1BurnedMax;
         uint256 amount0Desired;
         uint256 amount1Desired;
         uint256 amount0Min;
@@ -50,7 +50,7 @@ interface IPoolInitializer {
 
     /// @notice Swaps through pool to set the pool price
     /// @dev Intended for pools with dust amounts of liquidity as otherwise amount in will be substantial
-    /// Ignores effect on pool price of adding fee to liquidity for simpmlicity. Results in difference of < 1 bps in practice vs desired price
+    /// Ignores effect on pool price of adding fee to liquidity for simplicity. Results in difference of < 1 bps in practice vs desired price
     /// @param params The parameters necessary to initialize pool with `params.sqrtPriceX96`
     /// @return amount0 The amount of the input token0 to set the price
     /// @return amount1 The amount of the input token1 to set the price
