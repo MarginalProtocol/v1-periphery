@@ -18,12 +18,10 @@ def test_initializer_initialize_oracle_if_necessary__increases_oracle_cardinalit
     initializer, factory, pool, mock_univ3_pool_oracle_adjusted, sender, token0, token1
 ):
     obs_cardinality_min = factory.observationCardinalityMinimum()
-    maintenance = pool.maintenance()
     univ3_fee = mock_univ3_pool_oracle_adjusted.fee()
     params = (
         token0.address,
         token1.address,
-        maintenance,
         univ3_fee,
         obs_cardinality_min,
     )
@@ -37,12 +35,10 @@ def test_initializer_initializes_oracle_if_necessary__passes_when_oracle_cardina
     initializer, factory, pool, mock_univ3_pool_oracle_adjusted, sender, token0, token1
 ):
     obs_cardinality_min = factory.observationCardinalityMinimum()
-    maintenance = pool.maintenance()
     univ3_fee = mock_univ3_pool_oracle_adjusted.fee()
     params = (
         token0.address,
         token1.address,
-        maintenance,
         univ3_fee,
         obs_cardinality_min,
     )
@@ -57,7 +53,6 @@ def test_initializer_initializes_oracle_if_necessary__passes_when_oracle_cardina
     params = (
         token0.address,
         token1.address,
-        maintenance,
         univ3_fee,
         obs_cardinality_min + 1,
     )
@@ -77,12 +72,10 @@ def test_initializer_initialize_oracle_if_necessary__reverts_when_invalid_oracle
     sender,
 ):
     obs_cardinality_min = factory.observationCardinalityMinimum()
-    maintenance = pool.maintenance()
     univ3_fee = mock_univ3_pool_oracle_adjusted.fee()
     params = (
         rando_token_a_address,
         token1.address,
-        maintenance,
         univ3_fee,
         obs_cardinality_min,
     )
@@ -100,12 +93,10 @@ def test_initializer_initialize_oracle_if_necessary__reverts_when_token1_less_th
     sender,
 ):
     obs_cardinality_min = factory.observationCardinalityMinimum()
-    maintenance = pool.maintenance()
     univ3_fee = mock_univ3_pool_oracle_adjusted.fee()
     params = (
         token1.address,
         token0.address,
-        maintenance,
         univ3_fee,
         obs_cardinality_min,
     )
@@ -123,12 +114,10 @@ def test_initializer_initialize_oracle_if_necessary__reverts_when_oracle_cardina
     sender,
 ):
     slot0 = mock_univ3_pool_oracle_adjusted.slot0()
-    maintenance = pool.maintenance()
     univ3_fee = mock_univ3_pool_oracle_adjusted.fee()
     params = (
         token1.address,
         token0.address,
-        maintenance,
         univ3_fee,
         slot0.observationCardinalityNext - 1,
     )
@@ -146,12 +135,10 @@ def test_initializer_initialize_oracle_if_necessary__reverts_when_cardinality_ne
     sender,
 ):
     obs_cardinality_min = factory.observationCardinalityMinimum()
-    maintenance = pool.maintenance()
     univ3_fee = mock_univ3_pool_oracle_adjusted.fee()
     params = (
         token1.address,
         token0.address,
-        maintenance,
         univ3_fee,
         obs_cardinality_min - 1,
     )
