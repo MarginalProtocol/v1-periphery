@@ -6,6 +6,7 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Po
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 
 import {PeripheryValidation} from "@uniswap/v3-periphery/contracts/base/PeripheryValidation.sol";
+import {Multicall} from "@uniswap/v3-periphery/contracts/base/Multicall.sol";
 
 import {IMarginalV1SwapCallback} from "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1SwapCallback.sol";
 import {IMarginalV1Factory} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Factory.sol";
@@ -28,7 +29,8 @@ contract PoolInitializer is
     IMarginalV1SwapCallback,
     PeripheryImmutableState,
     LiquidityManagement,
-    PeripheryValidation
+    PeripheryValidation,
+    Multicall
 {
     using Path for bytes;
 
