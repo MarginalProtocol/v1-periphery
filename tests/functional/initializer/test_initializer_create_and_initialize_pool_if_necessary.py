@@ -1,5 +1,6 @@
 import pytest
 
+from ape import reverts
 from ape.utils import ZERO_ADDRESS
 
 from utils.constants import MINIMUM_LIQUIDITY, SECONDS_AGO, FEE, FEE_UNIT
@@ -476,4 +477,284 @@ def test_initializer_create_and_initialize_pool_if_necessary__emits_event(
     assert event.amount1 == amount1_in
 
 
-# TODO: test reverts
+def test_initializer_create_and_initialize_pool_if_necessary__reverts_when_oracle_invalid(
+    initializer,
+    mock_univ3_pool,
+    factory,
+    callee,
+    sender,
+    alice,
+    token0,
+    token1,
+    chain,
+    swap_math_lib,
+    spot_liquidity,
+    project,
+):
+    maintenance = 1000000  # pool three
+    sqrt_price_limit_x96 = 0  # either extreme of range as limit
+    liquidity_burned = MINIMUM_LIQUIDITY**2
+    deadline = chain.pending_timestamp + 3600
+
+    slot0 = mock_univ3_pool.slot0()  # univ3 slot0
+    univ3_fee = mock_univ3_pool.fee()
+    liquidity_desired = (spot_liquidity * 10) // 10000  # 0.1% of spot liquidity
+    (amount0_desired, amount1_desired) = calc_amounts_from_liquidity_sqrt_price_x96(
+        liquidity_desired, slot0.sqrtPriceX96
+    )
+
+    # check not already created marginal pool
+    assert (
+        factory.getPool(
+            token0.address, token1.address, maintenance, mock_univ3_pool.address
+        )
+        == ZERO_ADDRESS
+    )
+
+    params = (
+        token0.address,
+        token1.address,
+        maintenance,
+        univ3_fee + 1,  # should yield invalid oracle since not a fee tier
+        alice.address,  # recipient of the LP token minted
+        slot0.sqrtPriceX96,  # initializes to uni price
+        sqrt_price_limit_x96,
+        liquidity_burned,
+        2**255 - 1,  # amount0 burned max
+        2**255 - 1,  # amount1 burned max
+        amount0_desired,  # amount0 desired in LP
+        amount1_desired,  # amount1 desired in LP
+        0,  # amount0 min in LP
+        0,  # amount1 min in LP
+        deadline,
+    )
+    with reverts(initializer.InvalidOracle):
+        initializer.createAndInitializePoolIfNecessary(params, sender=sender)
+
+
+def test_initializer_create_and_initialize_pool_if_necessary__reverts_when_liquidity_burned_less_than_min(
+    initializer,
+    mock_univ3_pool,
+    factory,
+    callee,
+    sender,
+    alice,
+    token0,
+    token1,
+    chain,
+    swap_math_lib,
+    spot_liquidity,
+    project,
+):
+    maintenance = 1000000  # pool three
+    sqrt_price_limit_x96 = 0  # either extreme of range as limit
+    liquidity_burned = MINIMUM_LIQUIDITY
+    deadline = chain.pending_timestamp + 3600
+
+    slot0 = mock_univ3_pool.slot0()  # univ3 slot0
+    univ3_fee = mock_univ3_pool.fee()
+    liquidity_desired = (spot_liquidity * 10) // 10000  # 0.1% of spot liquidity
+    (amount0_desired, amount1_desired) = calc_amounts_from_liquidity_sqrt_price_x96(
+        liquidity_desired, slot0.sqrtPriceX96
+    )
+
+    # check not already created marginal pool
+    assert (
+        factory.getPool(
+            token0.address, token1.address, maintenance, mock_univ3_pool.address
+        )
+        == ZERO_ADDRESS
+    )
+
+    params = (
+        token0.address,
+        token1.address,
+        maintenance,
+        univ3_fee,
+        alice.address,  # recipient of the LP token minted
+        slot0.sqrtPriceX96,  # initializes to uni price
+        sqrt_price_limit_x96,
+        liquidity_burned,
+        2**255 - 1,  # amount0 burned max
+        2**255 - 1,  # amount1 burned max
+        amount0_desired,  # amount0 desired in LP
+        amount1_desired,  # amount1 desired in LP
+        0,  # amount0 min in LP
+        0,  # amount1 min in LP
+        deadline,
+    )
+
+    with reverts(initializer.LiquidityBurnedLessThanMin):
+        initializer.createAndInitializePoolIfNecessary(params, sender=sender)
+
+
+def test_initializer_create_and_initialize_pool_if_necessary__reverts_when_amount0_burned_greater_than_max(
+    initializer,
+    mock_univ3_pool,
+    factory,
+    callee,
+    sender,
+    alice,
+    token0,
+    token1,
+    chain,
+    swap_math_lib,
+    spot_liquidity,
+    project,
+):
+    maintenance = 1000000  # pool three
+    sqrt_price_limit_x96 = 0  # either extreme of range as limit
+    liquidity_burned = MINIMUM_LIQUIDITY**2
+    deadline = chain.pending_timestamp + 3600
+
+    slot0 = mock_univ3_pool.slot0()  # univ3 slot0
+    univ3_fee = mock_univ3_pool.fee()
+    liquidity_desired = (spot_liquidity * 10) // 10000  # 0.1% of spot liquidity
+    (amount0_desired, amount1_desired) = calc_amounts_from_liquidity_sqrt_price_x96(
+        liquidity_desired, slot0.sqrtPriceX96
+    )
+
+    oracle_tick_cumulatives, _ = mock_univ3_pool.observe([SECONDS_AGO, 0])
+    oracle_tick_avg = (
+        oracle_tick_cumulatives[1] - oracle_tick_cumulatives[0]
+    ) // SECONDS_AGO
+    oracle_sqrt_price_x96 = calc_sqrt_price_x96_from_tick(oracle_tick_avg)
+
+    (
+        amount0_burned_on_mint,
+        amount1_burned_on_mint,
+    ) = calc_amounts_from_liquidity_sqrt_price_x96(
+        liquidity_burned, oracle_sqrt_price_x96
+    )
+
+    (amount0_burned_on_swap, amount1_burned_on_swap) = swap_math_lib.swapAmounts(
+        liquidity_burned,
+        oracle_sqrt_price_x96,
+        slot0.sqrtPriceX96,  # initialized to uni sqrt price
+    )
+
+    # include fees
+    # TODO: test when accounting for protocol fees
+    if amount0_burned_on_swap > 0:
+        amount0_burned_on_swap += (amount0_burned_on_swap * FEE) // FEE_UNIT
+    elif amount1_burned_on_swap > 0:
+        amount1_burned_on_swap += (amount1_burned_on_swap * FEE) // FEE_UNIT
+
+    amount0_burned = amount0_burned_on_mint + amount0_burned_on_swap
+
+    # check not already created marginal pool
+    assert (
+        factory.getPool(
+            token0.address, token1.address, maintenance, mock_univ3_pool.address
+        )
+        == ZERO_ADDRESS
+    )
+
+    params = (
+        token0.address,
+        token1.address,
+        maintenance,
+        univ3_fee,
+        alice.address,  # recipient of the LP token minted
+        slot0.sqrtPriceX96,  # initializes to uni price
+        sqrt_price_limit_x96,
+        liquidity_burned,
+        amount0_burned - 1,  # amount0 burned max
+        2**255 - 1,  # amount1 burned max
+        amount0_desired,  # amount0 desired in LP
+        amount1_desired,  # amount1 desired in LP
+        0,  # amount0 min in LP
+        0,  # amount1 min in LP
+        deadline,
+    )
+
+    # @dev off by 1 in unit test due to rounding diff in contracts
+    with reverts(
+        initializer.Amount0BurnedGreaterThanMax, amount0Burned=amount0_burned + 1
+    ):
+        initializer.createAndInitializePoolIfNecessary(params, sender=sender)
+
+
+def test_initializer_create_and_initialize_pool_if_necessary__reverts_when_amount1_burned_greater_than_max(
+    initializer,
+    mock_univ3_pool,
+    factory,
+    callee,
+    sender,
+    alice,
+    token0,
+    token1,
+    chain,
+    swap_math_lib,
+    spot_liquidity,
+    project,
+):
+    maintenance = 1000000  # pool three
+    sqrt_price_limit_x96 = 0  # either extreme of range as limit
+    liquidity_burned = MINIMUM_LIQUIDITY**2
+    deadline = chain.pending_timestamp + 3600
+
+    slot0 = mock_univ3_pool.slot0()  # univ3 slot0
+    univ3_fee = mock_univ3_pool.fee()
+    liquidity_desired = (spot_liquidity * 10) // 10000  # 0.1% of spot liquidity
+    (amount0_desired, amount1_desired) = calc_amounts_from_liquidity_sqrt_price_x96(
+        liquidity_desired, slot0.sqrtPriceX96
+    )
+
+    oracle_tick_cumulatives, _ = mock_univ3_pool.observe([SECONDS_AGO, 0])
+    oracle_tick_avg = (
+        oracle_tick_cumulatives[1] - oracle_tick_cumulatives[0]
+    ) // SECONDS_AGO
+    oracle_sqrt_price_x96 = calc_sqrt_price_x96_from_tick(oracle_tick_avg)
+
+    (
+        amount0_burned_on_mint,
+        amount1_burned_on_mint,
+    ) = calc_amounts_from_liquidity_sqrt_price_x96(
+        liquidity_burned, oracle_sqrt_price_x96
+    )
+
+    (amount0_burned_on_swap, amount1_burned_on_swap) = swap_math_lib.swapAmounts(
+        liquidity_burned,
+        oracle_sqrt_price_x96,
+        slot0.sqrtPriceX96,  # initialized to uni sqrt price
+    )
+
+    # include fees
+    # TODO: test when accounting for protocol fees
+    if amount0_burned_on_swap > 0:
+        amount0_burned_on_swap += (amount0_burned_on_swap * FEE) // FEE_UNIT
+    elif amount1_burned_on_swap > 0:
+        amount1_burned_on_swap += (amount1_burned_on_swap * FEE) // FEE_UNIT
+
+    amount1_burned = amount1_burned_on_mint + amount1_burned_on_swap
+
+    # check not already created marginal pool
+    assert (
+        factory.getPool(
+            token0.address, token1.address, maintenance, mock_univ3_pool.address
+        )
+        == ZERO_ADDRESS
+    )
+
+    params = (
+        token0.address,
+        token1.address,
+        maintenance,
+        univ3_fee,
+        alice.address,  # recipient of the LP token minted
+        slot0.sqrtPriceX96,  # initializes to uni price
+        sqrt_price_limit_x96,
+        liquidity_burned,
+        2**255 - 1,  # amount0 burned max
+        amount1_burned - 1,  # amount1 burned max
+        amount0_desired,  # amount0 desired in LP
+        amount1_desired,  # amount1 desired in LP
+        0,  # amount0 min in LP
+        0,  # amount1 min in LP
+        deadline,
+    )
+
+    # @dev off by rel ~1e-5 in unit test due to rounding diff in contracts
+    with reverts(initializer.Amount1BurnedGreaterThanMax):
+        initializer.createAndInitializePoolIfNecessary(params, sender=sender)
