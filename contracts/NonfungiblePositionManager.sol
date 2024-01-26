@@ -41,6 +41,7 @@ contract NonfungiblePositionManager is
     event Mint(
         uint256 indexed tokenId,
         address indexed recipient,
+        uint256 positionId,
         uint256 size,
         uint256 debt,
         uint256 margin,
@@ -197,7 +198,16 @@ contract NonfungiblePositionManager is
         // sweep any excess ETH from escrowed rewards to sender at end of function to avoid re-entrancy with fallback
         sweepETH(0, msg.sender);
 
-        emit Mint(tokenId, params.recipient, size, debt, margin, fees, rewards);
+        emit Mint(
+            tokenId,
+            params.recipient,
+            positionId,
+            size,
+            debt,
+            margin,
+            fees,
+            rewards
+        );
     }
 
     /// @inheritdoc INonfungiblePositionManager

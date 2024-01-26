@@ -462,6 +462,7 @@ def test_manager_mint__emits_mint(
     event = events[0]
     assert event.tokenId == next_id
     assert event.recipient == sender.address
+    assert event.positionId == position_id
     assert event.size == position.size
     assert event.debt == debt
     assert event.margin == position.margin

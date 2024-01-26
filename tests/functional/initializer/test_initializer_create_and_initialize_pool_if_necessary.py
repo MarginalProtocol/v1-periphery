@@ -476,4 +476,4 @@ def test_initializer_create_and_initialize_pool_if_necessary__emits_event(
     assert event.amount1 == amount1_in
 
 
-# TODO: test price limits
+# TODO: test reverts
