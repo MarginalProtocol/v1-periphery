@@ -310,7 +310,7 @@ contract Quoter is
             int24 tick,
             uint32 blockTimestampLast,
             int56 tickCumulativeLast,
-            uint8 feeProtocol,
+            ,
 
         ) = getStateSynced(address(pool));
         int56[] memory oracleTickCumulativesLast = getOracleSynced(
@@ -409,7 +409,72 @@ contract Quoter is
             uint160 sqrtPriceX96After,
             uint128 liquidityLockedAfter
         )
-    {}
+    {
+        (, uint96 positionId, , , , , , , , ) = manager.positions(
+            params.tokenId
+        );
+        IMarginalV1Pool pool = getPool(
+            PoolAddress.PoolKey({
+                token0: params.token0,
+                token1: params.token1,
+                maintenance: params.maintenance,
+                oracle: params.oracle
+            })
+        );
+
+        (
+            uint160 sqrtPriceX96,
+            ,
+            uint128 liquidity,
+            int24 tick,
+            uint32 blockTimestampLast,
+            int56 tickCumulativeLast,
+            ,
+
+        ) = getStateSynced(address(pool));
+        int56[] memory oracleTickCumulativesLast = getOracleSynced(
+            address(pool)
+        );
+        PositionLibrary.Info memory position = _getPositionInfoSynced(
+            address(pool),
+            positionId,
+            blockTimestampLast,
+            tickCumulativeLast,
+            oracleTickCumulativesLast[1] // zero seconds ago
+        );
+        if (position.size == 0) revert("Invalid position");
+
+        uint160 oracleSqrtPriceX96 = OracleLibrary.oracleSqrtPriceX96(
+            OracleLibrary.oracleTickCumulativeDelta(
+                oracleTickCumulativesLast[0],
+                oracleTickCumulativesLast[1]
+            ),
+            PoolConstants.secondsAgo
+        );
+        if (
+            PositionLibrary.safe(
+                position,
+                oracleSqrtPriceX96,
+                params.maintenance
+            )
+        ) revert("Position safe");
+
+        uint128 liquidityLocked = pool.liquidityLocked();
+        liquidityLockedAfter = liquidityLocked - position.liquidityLocked;
+        (uint256 amount0, uint256 amount1) = PositionLibrary.amountsLocked(
+            position
+        );
+
+        rewards = position.rewards;
+
+        (liquidityAfter, sqrtPriceX96After) = LiquidityMath
+            .liquiditySqrtPriceX96Next(
+                liquidity,
+                sqrtPriceX96,
+                int256(amount0),
+                int256(amount1)
+            );
+    }
 
     /// @inheritdoc IQuoter
     function quoteExactInputSingle(
