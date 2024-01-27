@@ -31,14 +31,19 @@ contract Quoter is
     PeripheryImmutableState,
     PeripheryValidation,
     PositionState,
-    Multicall // TODO: test
+    Multicall
 {
     using Path for bytes;
 
+    INonfungiblePositionManager public immutable manager;
+
     constructor(
         address _factory,
-        address _WETH9
-    ) PeripheryImmutableState(_factory, _WETH9) {}
+        address _WETH9,
+        address _manager
+    ) PeripheryImmutableState(_factory, _WETH9) {
+        manager = INonfungiblePositionManager(_manager);
+    }
 
     /// @dev Returns the pool for the given token pair and maintenance. The pool contract may or may not exist.
     function getPool(
@@ -217,6 +222,195 @@ contract Quoter is
         }
     }
 
+    /// @notice Gets the pool position info synced for funding
+    function _getPositionInfoSynced(
+        address pool,
+        uint96 positionId,
+        uint32 blockTimestampLast,
+        int56 tickCumulativeLast,
+        int56 oracleTickCumulativeLast
+    ) internal view returns (PositionLibrary.Info memory position) {
+        bytes32 key = keccak256(abi.encodePacked(address(manager), positionId));
+        (
+            uint128 _size,
+            uint128 _debt0,
+            uint128 _debt1,
+            uint128 _insurance0,
+            uint128 _insurance1,
+            bool _zeroForOne,
+            bool _liquidated,
+            int24 _tick,
+            uint32 _blockTimestamp,
+            int56 _tickCumulativeDelta,
+            uint128 _margin,
+            uint128 _liquidityLocked,
+            uint256 _rewards
+        ) = IMarginalV1Pool(pool).positions(key);
+
+        position = PositionLibrary.Info({
+            size: _size,
+            debt0: _debt0,
+            debt1: _debt1,
+            insurance0: _insurance0,
+            insurance1: _insurance1,
+            zeroForOne: _zeroForOne,
+            liquidated: _liquidated,
+            tick: _tick,
+            blockTimestamp: _blockTimestamp,
+            tickCumulativeDelta: _tickCumulativeDelta,
+            margin: _margin,
+            liquidityLocked: _liquidityLocked,
+            rewards: _rewards
+        });
+
+        if (position.size > 0) {
+            PositionLibrary.sync(
+                position,
+                blockTimestampLast,
+                tickCumulativeLast,
+                oracleTickCumulativeLast,
+                PoolConstants.tickCumulativeRateMax,
+                PoolConstants.fundingPeriod
+            );
+        }
+    }
+
+    /// @inheritdoc IQuoter
+    function quoteBurn(
+        INonfungiblePositionManager.BurnParams calldata params
+    )
+        external
+        view
+        checkDeadline(params.deadline)
+        returns (
+            uint256 amountIn,
+            uint256 amountOut,
+            uint256 rewards,
+            uint128 liquidityAfter,
+            uint160 sqrtPriceX96After,
+            uint128 liquidityLockedAfter
+        )
+    {
+        (, uint96 positionId, , , , , , , , ) = manager.positions(
+            params.tokenId
+        );
+        IMarginalV1Pool pool = getPool(
+            PoolAddress.PoolKey({
+                token0: params.token0,
+                token1: params.token1,
+                maintenance: params.maintenance,
+                oracle: params.oracle
+            })
+        );
+
+        (
+            uint160 sqrtPriceX96,
+            ,
+            uint128 liquidity,
+            int24 tick,
+            uint32 blockTimestampLast,
+            int56 tickCumulativeLast,
+            uint8 feeProtocol,
+
+        ) = getStateSynced(address(pool));
+        int56[] memory oracleTickCumulativesLast = getOracleSynced(
+            address(pool)
+        );
+        PositionLibrary.Info memory position = _getPositionInfoSynced(
+            address(pool),
+            positionId,
+            blockTimestampLast,
+            tickCumulativeLast,
+            oracleTickCumulativesLast[1] // zero seconds ago
+        );
+        if (position.size == 0) revert("Invalid position");
+
+        uint128 liquidityLocked = pool.liquidityLocked();
+        liquidityLockedAfter = liquidityLocked - position.liquidityLocked;
+        (uint256 amount0Unlocked, uint256 amount1Unlocked) = PositionLibrary
+            .amountsLocked(position);
+
+        rewards = position.rewards;
+
+        int256 amount0;
+        int256 amount1;
+        if (!position.zeroForOne) {
+            amount0 = -int256(
+                uint256(position.size) + uint256(position.margin)
+            ); // size + margin out
+            amount1 = int256(uint256(position.debt1)); // debt in
+
+            (liquidityAfter, sqrtPriceX96After) = LiquidityMath
+                .liquiditySqrtPriceX96Next(
+                    liquidity,
+                    sqrtPriceX96,
+                    int256(
+                        amount0Unlocked -
+                            uint256(position.size) -
+                            uint256(position.margin)
+                    ), // insurance0 + debt0
+                    int256(amount1Unlocked) + amount1 // insurance1 + debt1
+                );
+        } else {
+            amount0 = int256(uint256(position.debt0)); // debt in
+            amount1 = -int256(
+                uint256(position.size) + uint256(position.margin)
+            ); // size + margin out
+
+            (liquidityAfter, sqrtPriceX96After) = LiquidityMath
+                .liquiditySqrtPriceX96Next(
+                    liquidity,
+                    sqrtPriceX96,
+                    int256(amount0Unlocked) + amount0, // insurance0 + debt0
+                    int256(
+                        amount1Unlocked -
+                            uint256(position.size) -
+                            uint256(position.margin)
+                    ) // insurance1 + debt1
+                );
+        }
+
+        amountIn = amount0 > 0
+            ? uint256(amount0)
+            : (amount1 > 0 ? uint256(amount1) : 0);
+        amountOut = amount0 < 0
+            ? uint256(-amount0)
+            : (amount1 < 0 ? uint256(-amount1) : 0);
+    }
+
+    /// @inheritdoc IQuoter
+    function quoteIgnite(
+        INonfungiblePositionManager.IgniteParams calldata params
+    )
+        external
+        view
+        checkDeadline(params.deadline)
+        returns (
+            uint256 amountOut,
+            uint256 rewards,
+            uint128 liquidityAfter,
+            uint160 sqrtPriceX96After,
+            uint128 liquidityLockedAfter,
+            uint128 oracleLiquidityAfter,
+            uint160 oracleSqrtPriceX96After
+        )
+    {}
+
+    /// @inheritdoc IQuoter
+    function quoteGrab(
+        INonfungiblePositionManager.GrabParams calldata params
+    )
+        external
+        view
+        checkDeadline(params.deadline)
+        returns (
+            uint256 rewards,
+            uint128 liquidityAfter,
+            uint160 sqrtPriceX96After,
+            uint128 liquidityLockedAfter
+        )
+    {}
+
     /// @inheritdoc IQuoter
     function quoteExactInputSingle(
         IRouter.ExactInputSingleParams memory params
@@ -373,8 +567,6 @@ contract Quoter is
 
         if (amountOut < params.amountOutMinimum) revert("Too little received");
     }
-
-    // TODO: quote settle/ignite
 
     /// @inheritdoc IQuoter
     function quoteExactOutputSingle(
@@ -539,6 +731,7 @@ contract Quoter is
     )
         external
         view
+        checkDeadline(params.deadline)
         returns (
             uint256 shares,
             uint256 amount0,
@@ -608,6 +801,7 @@ contract Quoter is
     )
         external
         view
+        checkDeadline(params.deadline)
         returns (
             uint128 liquidityDelta,
             uint256 amount0,

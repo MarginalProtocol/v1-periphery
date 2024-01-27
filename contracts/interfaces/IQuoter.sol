@@ -16,6 +16,7 @@ interface IQuoter {
     /// @return safe Whether the position will be safe given current oracle price averaged over seconds ago
     /// @return liquidityAfter Pool liquidity after mint
     /// @return sqrtPriceX96After Pool sqrt price after mint
+    /// @return liquidityLockedAfter Pool locked liquidity after mint
     function quoteMint(
         INonfungiblePositionManager.MintParams calldata params
     )
@@ -28,6 +29,73 @@ interface IQuoter {
             uint256 safeMarginMinimum,
             uint256 fees,
             bool safe,
+            uint128 liquidityAfter,
+            uint160 sqrtPriceX96After,
+            uint128 liquidityLockedAfter
+        );
+
+    /// @notice Quotes the result of calling NonfungiblePositionManager::burn
+    /// @param params Param inputs to NonfungiblePositionManager::burn
+    /// @dev Reverts if burn would revert
+    /// @return amountIn Amount of debt token in needed to burn the position
+    /// @return amountOut Amount of margin token out after burning the position
+    /// @return rewards Amount of escrowed liquidation rewards out after burning the position
+    /// @return liquidityAfter Pool liquidity after burn
+    /// @return sqrtPriceX96After Pool sqrt price after burn
+    /// @return liquidityLockedAfter Pool locked liquidity after burn
+    function quoteBurn(
+        INonfungiblePositionManager.BurnParams calldata params
+    )
+        external
+        view
+        returns (
+            uint256 amountIn,
+            uint256 amountOut,
+            uint256 rewards,
+            uint128 liquidityAfter,
+            uint160 sqrtPriceX96After,
+            uint128 liquidityLockedAfter
+        );
+
+    /// @notice Quotes the result of calling NonfungiblePositionManager::ignite
+    /// @param params Param inputs to NonfungiblePositionManager::ignite
+    /// @dev Reverts if ignite would revert
+    /// @return amountOut Amount of margin token out after igniting the position
+    /// @return rewards Amount of escrowed liquidation rewards out after igniting the position
+    /// @return liquidityAfter Pool liquidity after ignite
+    /// @return sqrtPriceX96After Pool sqrt price after ignite
+    /// @return liquidityLockedAfter Pool locked liquidity after ignite
+    /// @return oracleLiquidityAfter Oracle liquidity after ignite
+    /// @return oracleSqrtPriceX96After Oracle sqrt price after ignite
+    function quoteIgnite(
+        INonfungiblePositionManager.IgniteParams calldata params
+    )
+        external
+        view
+        returns (
+            uint256 amountOut,
+            uint256 rewards,
+            uint128 liquidityAfter,
+            uint160 sqrtPriceX96After,
+            uint128 liquidityLockedAfter,
+            uint128 oracleLiquidityAfter,
+            uint160 oracleSqrtPriceX96After
+        );
+
+    /// @notice Quotes the result of calling NonfungiblePositionManager::grab
+    /// @param params Param inputs to NonfungiblePositionManager::grab
+    /// @dev Reverts if grab would revert
+    /// @return rewards Amount of escrowed liquidation rewards out to liquidator after grabbing the position
+    /// @return liquidityAfter Pool liquidity after grab
+    /// @return sqrtPriceX96After Pool sqrt price after grab
+    /// @return liquidityLockedAfter Pool locked liquidity after grab
+    function quoteGrab(
+        INonfungiblePositionManager.GrabParams calldata params
+    )
+        external
+        view
+        returns (
+            uint256 rewards,
             uint128 liquidityAfter,
             uint160 sqrtPriceX96After,
             uint128 liquidityLockedAfter
