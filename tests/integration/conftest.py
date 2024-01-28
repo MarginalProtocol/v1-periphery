@@ -41,6 +41,11 @@ def univ3_pool(assert_mainnet_fork, Contract):
 
 
 @pytest.fixture(scope="module")
+def univ3_static_quoter(assert_mainnet_fork, Contract):
+    return Contract("0xc80f61d1bdAbD8f5285117e1558fDDf8C64870FE")
+
+
+@pytest.fixture(scope="module")
 def mrglv1_factory(project, accounts, univ3_factory):
     deployer = project.MarginalV1PoolDeployer.deploy(sender=accounts[0])
     obs_cardinality_min = (
@@ -66,9 +71,15 @@ def mrglv1_router(project, accounts, mrglv1_factory, WETH9):
 
 
 @pytest.fixture(scope="module")
-def mrglv1_quoter(project, accounts, mrglv1_factory, WETH9):
+def mrglv1_quoter(
+    project, accounts, mrglv1_factory, WETH9, mrglv1_manager, univ3_static_quoter
+):
     return project.Quoter.deploy(
-        mrglv1_factory.address, WETH9.address, sender=accounts[0]
+        mrglv1_factory.address,
+        WETH9.address,
+        mrglv1_manager.address,
+        univ3_static_quoter.address,
+        sender=accounts[0],
     )
 
 
