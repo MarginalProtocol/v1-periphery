@@ -20,6 +20,7 @@ def main():
     publish = click.prompt("Publish to Etherscan?", default=False)
 
     # deploy marginal v1 position manager
+    manager = None
     if click.confirm("Deploy Marginal v1 NFT position manager?"):
         click.echo("Deploying Marginal v1 NFT position manager ...")
         manager = project.NonfungiblePositionManager.deploy(
@@ -43,10 +44,19 @@ def main():
 
     # deploy marginal v1 quoter
     if click.confirm("Deploy Marginal v1 quoter?"):
+        manager_address = manager.address if manager is not None else None
+        if manager_address is None:
+            manager_address = click.prompt(
+                "Marginal v1 NFT position manager address", type=str
+            )
+        quoter_address = click.prompt("Uniswap v3 static quoter address", type=str)
+
         click.echo("Deploying Marginal v1 quoter ...")
         quoter = project.Quoter.deploy(
             factory_address,
             weth9_address,
+            manager_address,
+            quoter_address,
             sender=deployer,
             publish=publish,
         )
