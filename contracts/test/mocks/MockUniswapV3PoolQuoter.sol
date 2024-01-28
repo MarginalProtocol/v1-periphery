@@ -6,13 +6,14 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Po
 import {SqrtPriceMath} from "@marginal/v1-core/contracts/libraries/SqrtPriceMath.sol";
 import {SwapMath} from "@marginal/v1-core/contracts/libraries/SwapMath.sol";
 
-contract MockUniswapV3PoolQuoter {
+import {IUniswapV3StaticQuoter} from "../../interfaces/IUniswapV3StaticQuoter.sol";
+
+contract MockUniswapV3PoolQuoter is IUniswapV3StaticQuoter {
     constructor() {}
 
     /// @dev simple swap quote similar to marginal pool
     function quote(
         address pool,
-        address recipient,
         bool zeroForOne,
         int256 amountSpecified,
         uint160 sqrtPriceLimitX96
