@@ -227,9 +227,18 @@ def router(project, accounts, factory, WETH9):
 
 
 @pytest.fixture(scope="session")
-def quoter(project, accounts, factory, WETH9, manager):
+def mock_univ3_quoter(project, accounts):
+    return project.MockUniswapV3PoolQuoter.deploy(sender=accounts[0])
+
+
+@pytest.fixture(scope="session")
+def quoter(project, accounts, factory, WETH9, manager, mock_univ3_quoter):
     return project.Quoter.deploy(
-        factory.address, WETH9.address, manager.address, sender=accounts[0]
+        factory.address,
+        WETH9.address,
+        manager.address,
+        mock_univ3_quoter.address,
+        sender=accounts[0],
     )
 
 

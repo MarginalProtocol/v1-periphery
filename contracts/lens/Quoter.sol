@@ -24,6 +24,7 @@ import {PositionAmounts} from "../libraries/PositionAmounts.sol";
 
 import {INonfungiblePositionManager} from "../interfaces/INonfungiblePositionManager.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
+import {IUniswapV3StaticQuoter} from "../interfaces/IUniswapV3StaticQuoter.sol";
 import {IQuoter} from "../interfaces/IQuoter.sol";
 
 contract Quoter is
@@ -36,13 +37,16 @@ contract Quoter is
     using Path for bytes;
 
     INonfungiblePositionManager public immutable manager;
+    IUniswapV3StaticQuoter public immutable uniswapV3Quoter;
 
     constructor(
         address _factory,
         address _WETH9,
-        address _manager
+        address _manager,
+        address _uniswapV3Quoter
     ) PeripheryImmutableState(_factory, _WETH9) {
         manager = INonfungiblePositionManager(_manager);
+        uniswapV3Quoter = IUniswapV3StaticQuoter(_uniswapV3Quoter);
     }
 
     /// @dev Returns the pool for the given token pair and maintenance. The pool contract may or may not exist.
@@ -223,6 +227,12 @@ contract Quoter is
     }
 
     /// @notice Gets the pool position info synced for funding
+    /// @param pool The address of the pool position is on
+    /// @param positionId The ID of the pool position
+    /// @param blockTimestampLast The last synced Marginal v1 pool timestamp
+    /// @param tickCumulativeLast The last synced Marginal v1 pool tick cumulative
+    /// @param oracleTickCumulativeLast The last synced Uniswap v3 oracle pool tick cumulative
+    /// @return position The synced pool position info
     function _getPositionInfoSynced(
         address pool,
         uint96 positionId,
@@ -390,11 +400,115 @@ contract Quoter is
             uint256 rewards,
             uint128 liquidityAfter,
             uint160 sqrtPriceX96After,
-            uint128 liquidityLockedAfter,
-            uint128 oracleLiquidityAfter,
-            uint160 oracleSqrtPriceX96After
+            uint128 liquidityLockedAfter
         )
-    {}
+    {
+        (, uint96 positionId, , , , , , , , ) = manager.positions(
+            params.tokenId
+        );
+        IMarginalV1Pool pool = getPool(
+            PoolAddress.PoolKey({
+                token0: params.token0,
+                token1: params.token1,
+                maintenance: params.maintenance,
+                oracle: params.oracle
+            })
+        );
+
+        (
+            uint160 sqrtPriceX96,
+            ,
+            uint128 liquidity,
+            int24 tick,
+            uint32 blockTimestampLast,
+            int56 tickCumulativeLast,
+            ,
+
+        ) = getStateSynced(address(pool));
+        int56[] memory oracleTickCumulativesLast = getOracleSynced(
+            address(pool)
+        );
+        PositionLibrary.Info memory position = _getPositionInfoSynced(
+            address(pool),
+            positionId,
+            blockTimestampLast,
+            tickCumulativeLast,
+            oracleTickCumulativesLast[1] // zero seconds ago
+        );
+        if (position.size == 0) revert("Invalid position");
+
+        uint128 liquidityLocked = pool.liquidityLocked();
+        liquidityLockedAfter = liquidityLocked - position.liquidityLocked;
+        (uint256 amount0Unlocked, uint256 amount1Unlocked) = PositionLibrary
+            .amountsLocked(position);
+
+        rewards = position.rewards;
+
+        int256 amount0;
+        int256 amount1;
+        if (!position.zeroForOne) {
+            amount0 = -int256(
+                uint256(position.size) + uint256(position.margin)
+            ); // size + margin out
+            amount1 = int256(uint256(position.debt1)); // debt in
+
+            (liquidityAfter, sqrtPriceX96After) = LiquidityMath
+                .liquiditySqrtPriceX96Next(
+                    liquidity,
+                    sqrtPriceX96,
+                    int256(
+                        amount0Unlocked -
+                            uint256(position.size) -
+                            uint256(position.margin)
+                    ), // insurance0 + debt0
+                    int256(amount1Unlocked) + amount1 // insurance1 + debt1
+                );
+        } else {
+            amount0 = int256(uint256(position.debt0)); // debt in
+            amount1 = -int256(
+                uint256(position.size) + uint256(position.margin)
+            ); // size + margin out
+
+            (liquidityAfter, sqrtPriceX96After) = LiquidityMath
+                .liquiditySqrtPriceX96Next(
+                    liquidity,
+                    sqrtPriceX96,
+                    int256(amount0Unlocked) + amount0, // insurance0 + debt0
+                    int256(
+                        amount1Unlocked -
+                            uint256(position.size) -
+                            uint256(position.margin)
+                    ) // insurance1 + debt1
+                );
+        }
+
+        // unadjusted for swap on oracle pool to repay debt to Marginal v1 pool
+        amountOut = amount0 < 0
+            ? uint256(-amount0)
+            : (amount1 < 0 ? uint256(-amount1) : 0);
+
+        // amount in is debt repaid pulled from oracle Uniswap v3 pool in exact output swap
+        bool oracleZeroForOne = amount1 > 0;
+        (int256 oracleAmount0, int256 oracleAmount1) = uniswapV3Quoter.quote(
+            params.oracle,
+            oracleZeroForOne,
+            (oracleZeroForOne ? -amount1 : -amount0),
+            (
+                oracleZeroForOne
+                    ? TickMath.MIN_SQRT_RATIO + 1
+                    : TickMath.MAX_SQRT_RATIO - 1
+            )
+        );
+
+        uint256 oracleAmountIn = (
+            oracleZeroForOne ? uint256(oracleAmount0) : uint256(oracleAmount1)
+        );
+        if (amountOut < oracleAmountIn) revert("IIA"); // Uniswap v3 pool error for not enough balance in on swap
+
+        amountOut -= oracleAmountIn;
+        if (amountOut < params.amountOutMinimum)
+            revert("Amount out less than min");
+    }
 
     /// @inheritdoc IQuoter
     function quoteGrab(

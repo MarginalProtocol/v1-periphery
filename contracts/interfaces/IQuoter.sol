@@ -65,8 +65,6 @@ interface IQuoter {
     /// @return liquidityAfter Pool liquidity after ignite
     /// @return sqrtPriceX96After Pool sqrt price after ignite
     /// @return liquidityLockedAfter Pool locked liquidity after ignite
-    /// @return oracleLiquidityAfter Oracle liquidity after ignite
-    /// @return oracleSqrtPriceX96After Oracle sqrt price after ignite
     function quoteIgnite(
         INonfungiblePositionManager.IgniteParams calldata params
     )
@@ -77,9 +75,7 @@ interface IQuoter {
             uint256 rewards,
             uint128 liquidityAfter,
             uint160 sqrtPriceX96After,
-            uint128 liquidityLockedAfter,
-            uint128 oracleLiquidityAfter,
-            uint160 oracleSqrtPriceX96After
+            uint128 liquidityLockedAfter
         );
 
     /// @notice Quotes the result of calling NonfungiblePositionManager::grab
