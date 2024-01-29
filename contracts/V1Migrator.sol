@@ -11,7 +11,8 @@ import {PeripheryImmutableState} from "./base/PeripheryImmutableState.sol";
 import {IRouter} from "./interfaces/IRouter.sol";
 import {IV1Migrator} from "./interfaces/IV1Migrator.sol";
 
-/// @title Marginal V1 Migrator
+/// @title Marginal v1 Migrator
+/// @notice Migrates liquidity from Uniswap v3-compatible pairs into Marginal v1 pools
 contract V1Migrator is
     IV1Migrator,
     PeripheryImmutableState,

@@ -24,6 +24,8 @@ import {PoolConstants} from "./libraries/PoolConstants.sol";
 
 import {IPoolInitializer} from "./interfaces/IPoolInitializer.sol";
 
+/// @title Initializer for Marginal v1 pools
+/// @notice Provides methods for preparing, creating and initializing a Marginal v1 pool and its associated Uniswap v3 oracle
 contract PoolInitializer is
     IPoolInitializer,
     IMarginalV1SwapCallback,

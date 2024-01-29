@@ -2,8 +2,8 @@
 pragma solidity >=0.7.5;
 pragma abicoder v2;
 
-/// @title V1 Migrator
-/// @notice Enables migration of liqudity from Uniswap v3-compatible pairs into Marginal v1 pools
+/// @title The interface of the v1 Migrator
+/// @notice Migrates liquidity from Uniswap v3-compatible pairs into Marginal v1 pools
 interface IV1Migrator {
     struct MigrateParams {
         uint256 tokenId; // tokenId of the Uniswap v3 NFT position to migrate

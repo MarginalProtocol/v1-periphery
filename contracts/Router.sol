@@ -27,6 +27,9 @@ import {LiquidityAmounts} from "./libraries/LiquidityAmounts.sol";
 import {Path} from "./libraries/Path.sol";
 import {PoolAddress} from "./libraries/PoolAddress.sol";
 
+/// @title Marginal v1 router
+/// @notice Facilitates swaps and liquidity provision on Marginal v1 pools
+/// @dev Fork of the Uniswap v3 periphery SwapRouter
 contract Router is
     IRouter,
     IMarginalV1SwapCallback,

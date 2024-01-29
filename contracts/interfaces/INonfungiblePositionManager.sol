@@ -6,6 +6,8 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IPeripheryImmutableState} from "./IPeripheryImmutableState.sol";
 import {IPeripheryPayments} from "./IPeripheryPayments.sol";
 
+/// @title The interface of the non-fungible token for Marginal v1 leverage positions
+/// @notice Wraps Marginal v1 leverage positions in a non-fungible token to allow for transfers
 interface INonfungiblePositionManager is IERC721 {
     /// @notice Returns details of an existing position
     /// @param tokenId The NFT token id associated with the position

@@ -16,6 +16,8 @@ import {PoolAddress} from "./libraries/PoolAddress.sol";
 import {PositionAmounts} from "./libraries/PositionAmounts.sol";
 import {INonfungiblePositionManager} from "./interfaces/INonfungiblePositionManager.sol";
 
+/// @title Non-fungible token for Marginal v1 leverage positions
+/// @notice Wraps Marginal v1 leverage positions in the ERC721 non-fungible token interface
 contract NonfungiblePositionManager is
     INonfungiblePositionManager,
     Multicall,

@@ -2,6 +2,8 @@
 pragma solidity >=0.7.5;
 pragma abicoder v2;
 
+/// @title The interface for the Marginal v1 router
+/// @notice Facilitates swaps and liquidity provision on Marginal v1 pools
 interface IRouter {
     event IncreaseLiquidity(
         uint256 shares,

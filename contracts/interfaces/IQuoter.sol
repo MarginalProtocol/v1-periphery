@@ -4,6 +4,8 @@ pragma solidity >=0.7.5;
 import {INonfungiblePositionManager} from "./INonfungiblePositionManager.sol";
 import {IRouter} from "./IRouter.sol";
 
+/// @title The interface of the quoter for Marginal v1 pools
+/// @notice Quotes the result of leverage trades and swaps on Marginal v1 pools
 interface IQuoter {
     /// @notice Quotes the position result of NonfungiblePositionManager::mint
     /// @param params Param inputs to NonfungiblePositionManager::mint

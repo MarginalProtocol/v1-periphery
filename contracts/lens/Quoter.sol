@@ -27,6 +27,8 @@ import {IRouter} from "../interfaces/IRouter.sol";
 import {IUniswapV3StaticQuoter} from "../interfaces/IUniswapV3StaticQuoter.sol";
 import {IQuoter} from "../interfaces/IQuoter.sol";
 
+/// @title Quoter for Marginal v1 pools
+/// @notice Quotes the result of leverage trades and swaps on Marginal v1 pools
 contract Quoter is
     IQuoter,
     PeripheryImmutableState,
