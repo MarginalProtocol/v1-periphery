@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity =0.8.15;
 
+import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+
 import {TransferHelper} from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 import {IWETH9} from "@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol";
 import {INonfungiblePositionManager as IUniswapV3NonfungiblePositionManager} from "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
 import {Multicall} from "@uniswap/v3-periphery/contracts/base/Multicall.sol";
-import {SelfPermit} from "@uniswap/v3-periphery/contracts/base/SelfPermit.sol";
 
 import {PeripheryImmutableState} from "./base/PeripheryImmutableState.sol";
 import {IRouter} from "./interfaces/IRouter.sol";
@@ -13,12 +14,7 @@ import {IV1Migrator} from "./interfaces/IV1Migrator.sol";
 
 /// @title Marginal v1 Migrator
 /// @notice Migrates liquidity from Uniswap v3-compatible pairs into Marginal v1 pools
-contract V1Migrator is
-    IV1Migrator,
-    PeripheryImmutableState,
-    Multicall,
-    SelfPermit
-{
+contract V1Migrator is IV1Migrator, PeripheryImmutableState, Multicall {
     address public immutable marginalV1Router;
     address public immutable uniswapV3NonfungiblePositionManager;
 
@@ -28,6 +24,7 @@ contract V1Migrator is
     }
 
     error Unauthorized();
+    error LiquidityDeltaGreaterThanMax();
 
     constructor(
         address _factory,
@@ -47,33 +44,56 @@ contract V1Migrator is
         address spender,
         uint256 tokenId
     ) internal view returns (bool) {
-        IUniswapV3NonfungiblePositionManager manager = IUniswapV3NonfungiblePositionManager(
+        IUniswapV3NonfungiblePositionManager uniswapV3Manager = IUniswapV3NonfungiblePositionManager(
                 uniswapV3NonfungiblePositionManager
             );
-        address owner = manager.ownerOf(tokenId);
+        address owner = uniswapV3Manager.ownerOf(tokenId);
         return (spender == owner ||
-            manager.isApprovedForAll(owner, spender) ||
-            manager.getApproved(tokenId) == spender);
+            uniswapV3Manager.isApprovedForAll(owner, spender) ||
+            uniswapV3Manager.getApproved(tokenId) == spender);
     }
 
+    /// @inheritdoc IV1Migrator
     function migrate(
         MigrateParams calldata params
     ) external onlyApprovedOrOwner(params.tokenId) {
-        IUniswapV3NonfungiblePositionManager manager = IUniswapV3NonfungiblePositionManager(
+        IUniswapV3NonfungiblePositionManager uniswapV3Manager = IUniswapV3NonfungiblePositionManager(
                 uniswapV3NonfungiblePositionManager
             ); // uniswap v3
         IRouter router = IRouter(marginalV1Router); // marginal v1
 
-        manager.decreaseLiquidity(
+        (
+            ,
+            ,
+            address token0,
+            address token1,
+            uint24 fee,
+            ,
+            ,
+            uint128 liquidity,
+            ,
+            ,
+            ,
+
+        ) = uniswapV3Manager.positions(params.tokenId);
+        address oracle = IUniswapV3Factory(uniswapV3Factory).getPool(
+            token0,
+            token1,
+            fee
+        );
+
+        if (params.liquidityDelta > liquidity)
+            revert LiquidityDeltaGreaterThanMax();
+        uniswapV3Manager.decreaseLiquidity(
             IUniswapV3NonfungiblePositionManager.DecreaseLiquidityParams({
                 tokenId: params.tokenId,
-                liquidity: params.liquidityToMigrate,
+                liquidity: params.liquidityDelta,
                 amount0Min: params.amount0Min,
                 amount1Min: params.amount1Min,
                 deadline: params.deadline
             })
         );
-        (uint256 amount0, uint256 amount1) = manager.collect(
+        (uint256 amount0, uint256 amount1) = uniswapV3Manager.collect(
             IUniswapV3NonfungiblePositionManager.CollectParams({
                 tokenId: params.tokenId,
                 recipient: address(this),
@@ -83,16 +103,16 @@ contract V1Migrator is
         );
 
         // approve marginal swap router to pull
-        TransferHelper.safeApprove(params.token0, address(router), amount0);
-        TransferHelper.safeApprove(params.token1, address(router), amount1);
+        TransferHelper.safeApprove(token0, address(router), amount0);
+        TransferHelper.safeApprove(token1, address(router), amount1);
 
         (, uint256 amount0Migrated, uint256 amount1Migrated) = router
             .addLiquidity(
                 IRouter.AddLiquidityParams({
-                    token0: params.token0,
-                    token1: params.token1,
+                    token0: token0,
+                    token1: token1,
                     maintenance: params.maintenance,
-                    oracle: params.oracle,
+                    oracle: oracle,
                     recipient: params.recipient,
                     amount0Desired: amount0,
                     amount1Desired: amount1,
@@ -105,26 +125,26 @@ contract V1Migrator is
         // clear allowance and refund dust
         // ref @uniswap/v3-periphery/contracts/V3Migrator.sol#L71
         if (amount0Migrated < amount0) {
-            TransferHelper.safeApprove(params.token0, address(router), 0);
+            TransferHelper.safeApprove(token0, address(router), 0);
 
             uint256 refund0 = amount0 - amount0Migrated;
-            if (params.refundAsETH && params.token0 == WETH9) {
+            if (params.refundAsETH && token0 == WETH9) {
                 IWETH9(WETH9).withdraw(refund0);
                 TransferHelper.safeTransferETH(msg.sender, refund0);
             } else {
-                TransferHelper.safeTransfer(params.token0, msg.sender, refund0);
+                TransferHelper.safeTransfer(token0, msg.sender, refund0);
             }
         }
 
         if (amount1Migrated < amount1) {
-            TransferHelper.safeApprove(params.token1, address(router), 0);
+            TransferHelper.safeApprove(token1, address(router), 0);
 
             uint256 refund1 = amount1 - amount1Migrated;
-            if (params.refundAsETH && params.token1 == WETH9) {
+            if (params.refundAsETH && token1 == WETH9) {
                 IWETH9(WETH9).withdraw(refund1);
                 TransferHelper.safeTransferETH(msg.sender, refund1);
             } else {
-                TransferHelper.safeTransfer(params.token1, msg.sender, refund1);
+                TransferHelper.safeTransfer(token1, msg.sender, refund1);
             }
         }
     }

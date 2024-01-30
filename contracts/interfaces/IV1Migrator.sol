@@ -1,17 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.7.5;
-pragma abicoder v2;
 
 /// @title The interface of the v1 Migrator
 /// @notice Migrates liquidity from Uniswap v3-compatible pairs into Marginal v1 pools
 interface IV1Migrator {
     struct MigrateParams {
         uint256 tokenId; // tokenId of the Uniswap v3 NFT position to migrate
-        uint128 liquidityToMigrate;
-        address token0;
-        address token1;
+        uint128 liquidityDelta; // liquidity to migrate
         uint24 maintenance;
-        address oracle;
         uint256 amount0Min;
         uint256 amount1Min;
         address recipient;
