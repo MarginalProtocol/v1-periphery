@@ -364,7 +364,6 @@ contract PairArbitrageur is
             revert AmountOutLessThanMin(amountOut);
 
         if (params.sweepAsETH && params.tokenOut == WETH9) {
-            // TODO: test with integration ...
             IWETH9(WETH9).withdraw(amountOut);
             sweepETH(amountOut, params.recipient);
         } else {

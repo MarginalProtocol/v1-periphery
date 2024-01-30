@@ -84,6 +84,20 @@ def mrglv1_quoter(
 
 
 @pytest.fixture(scope="module")
+def mrglv1_initializer(project, accounts, mrglv1_factory, WETH9):
+    return project.PoolInitializer.deploy(
+        mrglv1_factory.address, WETH9.address, sender=accounts[0]
+    )
+
+
+@pytest.fixture(scope="module")
+def mrglv1_arbitrageur(project, accounts, mrglv1_factory, WETH9):
+    return project.PairArbitrageur.deploy(
+        mrglv1_factory.address, WETH9.address, sender=accounts[0]
+    )
+
+
+@pytest.fixture(scope="module")
 def create_mrglv1_pool(project, accounts, mrglv1_factory, univ3_pool):
     def create_pool(token_a, token_b, maintenance, univ3_fee):
         tx = mrglv1_factory.createPool(
@@ -113,6 +127,7 @@ def mrglv1_token0(
     callee,
     mrglv1_manager,
     mrglv1_router,
+    mrglv1_initializer,
     whale,
 ):
     liquidity = univ3_pool.liquidity()
@@ -124,6 +139,7 @@ def mrglv1_token0(
     token0.approve(callee.address, 2**256 - 1, sender=sender)
     token0.approve(mrglv1_manager.address, 2**256 - 1, sender=sender)
     token0.approve(mrglv1_router.address, 2**256 - 1, sender=sender)
+    token0.approve(mrglv1_initializer.address, 2**256 - 1, sender=sender)
     token0.transfer(sender.address, amount0, sender=whale)
     return token0
 
@@ -138,6 +154,7 @@ def mrglv1_token1(
     callee,
     mrglv1_manager,
     mrglv1_router,
+    mrglv1_initializer,
     whale,
 ):
     liquidity = univ3_pool.liquidity()
@@ -149,6 +166,7 @@ def mrglv1_token1(
     token1.approve(callee.address, 2**256 - 1, sender=sender)
     token1.approve(mrglv1_manager.address, 2**256 - 1, sender=sender)
     token1.approve(mrglv1_router.address, 2**256 - 1, sender=sender)
+    token1.approve(mrglv1_initializer.address, 2**256 - 1, sender=sender)
     token1.transfer(sender.address, amount1, sender=whale)
     return token1
 
