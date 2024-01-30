@@ -250,6 +250,13 @@ def initializer(project, accounts, factory, WETH9):
 
 
 @pytest.fixture(scope="session")
+def arbitrageur(project, accounts, factory, WETH9):
+    return project.PairArbitrageur.deploy(
+        factory.address, WETH9.address, sender=accounts[0]
+    )
+
+
+@pytest.fixture(scope="session")
 def pool_address_lib(project, accounts):
     return project.MockPoolAddress.deploy(sender=accounts[0])
 

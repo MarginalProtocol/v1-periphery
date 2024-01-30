@@ -9,7 +9,7 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Po
 
 import {PeripheryValidation} from "@uniswap/v3-periphery/contracts/base/PeripheryValidation.sol";
 import {Multicall} from "@uniswap/v3-periphery/contracts/base/Multicall.sol";
-import {CallbackValidation as UniswapV3CallbackValidation} from "@uniswap/v3-periphery/contracts/libraries/CallbackValidation.sol";
+import {IWETH9} from "@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol";
 
 import {IMarginalV1SwapCallback} from "@marginal/v1-core/contracts/interfaces/callback/IMarginalV1SwapCallback.sol";
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
@@ -98,10 +98,10 @@ contract PairArbitrageur is
             uint24 uniswapV3Fee = IUniswapV3Pool(oracle).fee();
             SwapCallbackData memory data_ = SwapCallbackData({
                 path: abi.encodePacked(
-                    tokenIn_, // tokenIn
-                    uniswapV3Fee, // fee; bit of a hack on uint24 for uni callback validation
-                    msg.sender, // pool; bit of a hack on address for uni callback validation
-                    tokenOut_ // tokenOut
+                    tokenIn_,
+                    maintenance,
+                    oracle,
+                    tokenOut_
                 ),
                 payer: data.payer
             });
@@ -137,16 +137,17 @@ contract PairArbitrageur is
         (
             address tokenIn,
             address tokenOut,
-            uint24 uniswapV3Fee,
-            address pool
+            uint24 maintenance,
+            address oracle
         ) = Path.decodeFirstPool(data.path);
-        if (!PoolAddress.isPool(factory, pool)) revert PoolInvalid();
-        UniswapV3CallbackValidation.verifyCallback(
-            uniswapV3Factory,
+
+        PoolAddress.PoolKey memory key = PoolAddress.getPoolKey(
             tokenIn,
             tokenOut,
-            uniswapV3Fee
+            maintenance,
+            oracle
         );
+        CallbackValidation.verifyUniswapV3Callback(factory, key);
 
         (bool isExactInput, uint256 amountToPay) = amount0Delta > 0
             ? (tokenIn < tokenOut, uint256(amount0Delta))
@@ -166,6 +167,7 @@ contract PairArbitrageur is
             bool zeroForOne = amount0Delta < 0; // sending token0 pulled from marginal in to uniswap
             int256 amountSpecified = zeroForOne ? -amount0Delta : -amount1Delta;
 
+            address pool = PoolAddress.getAddress(factory, key);
             uint24 maintenance = IMarginalV1Pool(pool).maintenance();
             SwapCallbackData memory data_ = SwapCallbackData({
                 path: abi.encodePacked(
@@ -208,6 +210,7 @@ contract PairArbitrageur is
         uint160 sqrtPriceLimit0X96; // limit on first pool swap
         uint160 sqrtPriceLimit1X96; // limit on second pool swap
         uint256 deadline;
+        bool sweepAsETH;
     }
 
     /// @notice Executes the arb between Marginal v1 pool and its associated Uniswap v3 oracle
@@ -328,12 +331,11 @@ contract PairArbitrageur is
 
             // amount specified on first pool swap is exactOutput
             // second swap on Marginal occurs in IUniswapV3SwapCallback
-            uint24 uniswapV3Fee = IUniswapV3Pool(params.oracle).fee();
             SwapCallbackData memory data = SwapCallbackData({
                 path: abi.encodePacked(
                     zeroForOne ? params.token1 : params.token0, // tokenOut
-                    uniswapV3Fee, // bit of a hack to use fee here
-                    pool, // bit of a hack to use Marginal v1 pool here
+                    params.maintenance,
+                    params.oracle,
                     zeroForOne ? params.token0 : params.token1 // tokenIn
                 ),
                 payer: address(this)
@@ -360,6 +362,13 @@ contract PairArbitrageur is
         amountOut = balance(params.tokenOut);
         if (amountOut < params.amountOutMinimum)
             revert AmountOutLessThanMin(amountOut);
-        pay(params.tokenOut, address(this), params.recipient, amountOut);
+
+        if (params.sweepAsETH && params.tokenOut == WETH9) {
+            // TODO: test with integration ...
+            IWETH9(WETH9).withdraw(amountOut);
+            sweepETH(amountOut, params.recipient);
+        } else {
+            sweepToken(params.tokenOut, amountOut, params.recipient);
+        }
     }
 }
