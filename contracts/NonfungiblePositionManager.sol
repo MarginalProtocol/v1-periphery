@@ -333,6 +333,7 @@ contract NonfungiblePositionManager is
             ? uint256(-amount0)
             : (amount1 < 0 ? uint256(-amount1) : 0);
 
+        // @dev ok after settle which has transfer ETH call given lock on all pool functions
         delete _positions[params.tokenId];
 
         _burn(params.tokenId);
@@ -382,6 +383,7 @@ contract NonfungiblePositionManager is
             })
         );
 
+        // @dev ok after flash which has transfer ETH call given lock on all pool functions
         delete _positions[params.tokenId];
 
         _burn(params.tokenId);

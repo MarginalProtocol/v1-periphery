@@ -41,6 +41,10 @@ abstract contract LiquidityManagement is
     }
 
     /// @notice Mints liquidity on pool
+    /// @param params The parameters necessary to mint liquidity on the pool
+    /// @return shares The amount of LP token shares minted to recipient
+    /// @return amount0 The amount of token0 added to the pool reserves
+    /// @return amount1 The amount of token1 added to the pool reserves
     function mint(
         MintParams memory params
     )
@@ -98,6 +102,10 @@ abstract contract LiquidityManagement is
     }
 
     /// @notice Burns liquidity on pool
+    /// @param params The parameters necessary to burn liquidity on the pool
+    /// @return liquidityDelta The liquidity removed from the pool
+    /// @return amount0 The amount of token0 removed from pool reserves
+    /// @return amount1 The amount of token1 removed from pool reserves
     function burn(
         BurnParams memory params
     )

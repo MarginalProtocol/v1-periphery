@@ -61,6 +61,13 @@ abstract contract PositionManagement is
     }
 
     /// @notice Opens a new position on pool
+    /// @param params The parameters necessary to open the position on the pool
+    /// @return id The position ID stored in the pool
+    /// @return size The position size on the pool in the margin token
+    /// @return debt The position debt owed to the pool in the non-margin token
+    /// @return margin The margin backing the position opened on the pool
+    /// @return fees The fees paid in margin token to open the position on the pool
+    /// @return rewards The rewards escrowed in opened position available to liquidators when position not safe
     function open(
         OpenParams memory params
     )
@@ -144,6 +151,9 @@ abstract contract PositionManagement is
     }
 
     /// @notice Adjusts margin backing position on pool
+    /// @param params The parameters necessary to adjust the position on the pool
+    /// @return margin0 The amount of token0 to be used as the new margin backing the position
+    /// @return margin1 The amount of token1 to be used as the new margin backing the position
     function adjust(
         AdjustParams memory params
     ) internal virtual returns (uint256 margin0, uint256 margin1) {
@@ -193,6 +203,10 @@ abstract contract PositionManagement is
     }
 
     /// @notice Settles a position on pool via external payer of debt
+    /// @param params The parameters necessary to settle the position on the pool
+    /// @return amount0 The delta of the balance of token0 of the pool. Position debt into the pool (> 0) if long token1 (zeroForOne = true), or position size and margin out of the pool (< 0) if long token0 (zeroForOne = false)
+    /// @return amount1 The delta of the balance of token1 of the pool. Position size and margin out of the pool (< 0) if long token1 (zeroForOne = true), or position debt into the pool (> 0) if long token0 (zeroForOne = false)
+    /// @return rewards The amount of escrowed native (gas) token sent to `params.recipient`
     function settle(
         SettleParams memory params
     )
@@ -228,6 +242,9 @@ abstract contract PositionManagement is
     }
 
     /// @notice Settles a position by repaying debt with portion of size swapped through spot
+    /// @param params The parameters necessary to flash settle the position on the pool
+    /// @return amountOut The amount of margin token received from pool less debts repaid via swapping on spot
+    /// @return rewards The amount of escrowed native (gas) token received after flash settling the position
     function flash(
         FlashParams memory params
     ) internal virtual returns (uint256 amountOut, uint256 rewards) {
@@ -342,6 +359,8 @@ abstract contract PositionManagement is
     }
 
     /// @notice Liquidates a position on pool
+    /// @param params The parameters necessary to liquidate a position on the pool
+    /// @return rewards The amount of escrowed liquidation rewards in native (gas) token received after liquidating the position
     function liquidate(
         LiquidateParams memory params
     ) internal virtual returns (uint256 rewards) {
