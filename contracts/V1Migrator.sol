@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity =0.8.15;
 
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
@@ -14,16 +14,11 @@ import {IV1Migrator} from "./interfaces/IV1Migrator.sol";
 
 /// @title Marginal v1 Migrator
 /// @notice Migrates liquidity from Uniswap v3-compatible pairs into Marginal v1 pools
+/// @dev Fork of Uniswap v3 migrator adapted to Marginal v1
 contract V1Migrator is IV1Migrator, PeripheryImmutableState, Multicall {
     address public immutable marginalV1Router;
     address public immutable uniswapV3NonfungiblePositionManager;
 
-    modifier onlyApprovedOrOwner(uint256 tokenId) {
-        if (!_isApprovedOrOwner(msg.sender, tokenId)) revert Unauthorized();
-        _;
-    }
-
-    error Unauthorized();
     error LiquidityDeltaGreaterThanMax();
 
     constructor(
@@ -40,23 +35,11 @@ contract V1Migrator is IV1Migrator, PeripheryImmutableState, Multicall {
         require(msg.sender == WETH9, "Not WETH9");
     }
 
-    function _isApprovedOrOwner(
-        address spender,
-        uint256 tokenId
-    ) internal view returns (bool) {
-        IUniswapV3NonfungiblePositionManager uniswapV3Manager = IUniswapV3NonfungiblePositionManager(
-                uniswapV3NonfungiblePositionManager
-            );
-        address owner = uniswapV3Manager.ownerOf(tokenId);
-        return (spender == owner ||
-            uniswapV3Manager.isApprovedForAll(owner, spender) ||
-            uniswapV3Manager.getApproved(tokenId) == spender);
-    }
-
     /// @inheritdoc IV1Migrator
-    function migrate(
-        MigrateParams calldata params
-    ) external onlyApprovedOrOwner(params.tokenId) {
+    function migrate(MigrateParams calldata params) external {
+        require(params.percentageToMigrate > 0, "Percentage too small");
+        require(params.percentageToMigrate <= 100, "Percentage too large");
+
         IUniswapV3NonfungiblePositionManager uniswapV3Manager = IUniswapV3NonfungiblePositionManager(
                 uniswapV3NonfungiblePositionManager
             ); // uniswap v3
@@ -82,14 +65,14 @@ contract V1Migrator is IV1Migrator, PeripheryImmutableState, Multicall {
             fee
         );
 
-        if (params.liquidityDelta > liquidity)
+        if (params.liquidityToRemove > liquidity)
             revert LiquidityDeltaGreaterThanMax();
         uniswapV3Manager.decreaseLiquidity(
             IUniswapV3NonfungiblePositionManager.DecreaseLiquidityParams({
                 tokenId: params.tokenId,
-                liquidity: params.liquidityDelta,
-                amount0Min: params.amount0Min,
-                amount1Min: params.amount1Min,
+                liquidity: params.liquidityToRemove,
+                amount0Min: params.amount0MinToRemove,
+                amount1Min: params.amount1MinToRemove,
                 deadline: params.deadline
             })
         );
@@ -102,9 +85,13 @@ contract V1Migrator is IV1Migrator, PeripheryImmutableState, Multicall {
             })
         );
 
+        // amounts to migrate to marginal
+        uint256 amount0ToMigrate = (amount0 * params.percentageToMigrate) / 100;
+        uint256 amount1ToMigrate = (amount1 * params.percentageToMigrate) / 100;
+
         // approve marginal swap router to pull
-        TransferHelper.safeApprove(token0, address(router), amount0);
-        TransferHelper.safeApprove(token1, address(router), amount1);
+        TransferHelper.safeApprove(token0, address(router), amount0ToMigrate);
+        TransferHelper.safeApprove(token1, address(router), amount1ToMigrate);
 
         (, uint256 amount0Migrated, uint256 amount1Migrated) = router
             .addLiquidity(
@@ -114,10 +101,10 @@ contract V1Migrator is IV1Migrator, PeripheryImmutableState, Multicall {
                     maintenance: params.maintenance,
                     oracle: oracle,
                     recipient: params.recipient,
-                    amount0Desired: amount0,
-                    amount1Desired: amount1,
-                    amount0Min: params.amount0Min, // TODO: should be diff from univ3 decreaseLiquidity?
-                    amount1Min: params.amount1Min, // TODO: should be diff from univ3 decreaseLiquidity?
+                    amount0Desired: amount0ToMigrate,
+                    amount1Desired: amount1ToMigrate,
+                    amount0Min: params.amount0MinToMigrate,
+                    amount1Min: params.amount1MinToMigrate,
                     deadline: params.deadline
                 })
             );
@@ -125,7 +112,8 @@ contract V1Migrator is IV1Migrator, PeripheryImmutableState, Multicall {
         // clear allowance and refund dust
         // ref @uniswap/v3-periphery/contracts/V3Migrator.sol#L71
         if (amount0Migrated < amount0) {
-            TransferHelper.safeApprove(token0, address(router), 0);
+            if (amount0Migrated < amount0ToMigrate)
+                TransferHelper.safeApprove(token0, address(router), 0);
 
             uint256 refund0 = amount0 - amount0Migrated;
             if (params.refundAsETH && token0 == WETH9) {
@@ -137,7 +125,8 @@ contract V1Migrator is IV1Migrator, PeripheryImmutableState, Multicall {
         }
 
         if (amount1Migrated < amount1) {
-            TransferHelper.safeApprove(token1, address(router), 0);
+            if (amount1Migrated < amount1ToMigrate)
+                TransferHelper.safeApprove(token1, address(router), 0);
 
             uint256 refund1 = amount1 - amount1Migrated;
             if (params.refundAsETH && token1 == WETH9) {

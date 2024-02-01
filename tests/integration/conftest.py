@@ -41,6 +41,11 @@ def univ3_pool(assert_mainnet_fork, Contract):
 
 
 @pytest.fixture(scope="module")
+def univ3_manager(assert_mainnet_fork, Contract):
+    return Contract("0xC36442b4a4522E871399CD717aBDD847Ab11FE88")
+
+
+@pytest.fixture(scope="module")
 def univ3_static_quoter(assert_mainnet_fork, Contract):
     return Contract("0xc80f61d1bdAbD8f5285117e1558fDDf8C64870FE")
 
@@ -98,6 +103,19 @@ def mrglv1_arbitrageur(project, accounts, mrglv1_factory, WETH9):
 
 
 @pytest.fixture(scope="module")
+def mrglv1_migrator(
+    project, accounts, mrglv1_factory, WETH9, mrglv1_router, univ3_manager
+):
+    return project.V1Migrator.deploy(
+        mrglv1_factory.address,
+        WETH9.address,
+        mrglv1_router.address,
+        univ3_manager.address,
+        sender=accounts[0],
+    )
+
+
+@pytest.fixture(scope="module")
 def create_mrglv1_pool(project, accounts, mrglv1_factory, univ3_pool):
     def create_pool(token_a, token_b, maintenance, univ3_fee):
         tx = mrglv1_factory.createPool(
@@ -128,6 +146,7 @@ def mrglv1_token0(
     mrglv1_manager,
     mrglv1_router,
     mrglv1_initializer,
+    univ3_manager,
     whale,
 ):
     liquidity = univ3_pool.liquidity()
@@ -140,6 +159,7 @@ def mrglv1_token0(
     token0.approve(mrglv1_manager.address, 2**256 - 1, sender=sender)
     token0.approve(mrglv1_router.address, 2**256 - 1, sender=sender)
     token0.approve(mrglv1_initializer.address, 2**256 - 1, sender=sender)
+    token0.approve(univ3_manager.address, 2**256 - 1, sender=sender)
     token0.transfer(sender.address, amount0, sender=whale)
     return token0
 
@@ -155,6 +175,7 @@ def mrglv1_token1(
     mrglv1_manager,
     mrglv1_router,
     mrglv1_initializer,
+    univ3_manager,
     whale,
 ):
     liquidity = univ3_pool.liquidity()
@@ -167,6 +188,7 @@ def mrglv1_token1(
     token1.approve(mrglv1_manager.address, 2**256 - 1, sender=sender)
     token1.approve(mrglv1_router.address, 2**256 - 1, sender=sender)
     token1.approve(mrglv1_initializer.address, 2**256 - 1, sender=sender)
+    token1.approve(univ3_manager.address, 2**256 - 1, sender=sender)
     token1.transfer(sender.address, amount1, sender=whale)
     return token1
 
