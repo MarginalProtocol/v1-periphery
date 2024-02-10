@@ -49,13 +49,14 @@ contract Oracle is IOracle, PeripheryImmutableState, PositionState, Multicall {
         returns (
             uint160 sqrtPriceX96,
             uint160 oracleSqrtPriceX96,
-            uint256 fundingSqrtRatioX96
+            uint256 fundingRatioX96
         )
     {
         IMarginalV1Pool pool = getPool(poolKey);
 
         bool initialized;
-        (sqrtPriceX96, , , , , , , initialized) = pool.state();
+        int24 tick;
+        (sqrtPriceX96, , , tick, , , , initialized) = pool.state();
         if (!initialized) revert("Not initialized");
 
         int56[] memory oracleTickCumulativesLast = getOracleSynced(
@@ -71,13 +72,29 @@ contract Oracle is IOracle, PeripheryImmutableState, PositionState, Multicall {
 
         // funding ratio for longs (zeroForOne = false) is anticipated funding rate over next funding period at current prices
         // @dev P / bar{P} for zeroForOne = false
-        (uint160 uniswapV3SqrtPriceX96, , , , , , ) = IUniswapV3Pool(
-            poolKey.oracle
-        ).slot0();
+        (, int24 uniswapV3Tick, , , , , ) = IUniswapV3Pool(poolKey.oracle)
+            .slot0();
 
-        fundingSqrtRatioX96 =
-            (uint256(sqrtPriceX96) << FixedPoint96.RESOLUTION) /
-            uint256(uniswapV3SqrtPriceX96);
+        int56 tickCumulative = int56(tick) *
+            int56(uint56(PoolConstants.fundingPeriod));
+        int56 oracleTickCumulative = int56(uniswapV3Tick) *
+            int56(uint56(PoolConstants.fundingPeriod));
+
+        int56 deltaMax = int56(uint56(PoolConstants.tickCumulativeRateMax)) *
+            int56(uint56(PoolConstants.fundingPeriod));
+        int56 delta = OracleLibrary.oracleTickCumulativeDelta(
+            oracleTickCumulative,
+            tickCumulative
+        ); // marginal tick - oracle tick (a_t - bar{a}_t)
+
+        // clamp if needed
+        if (delta > deltaMax) delta = deltaMax;
+        else if (delta < -deltaMax) delta = -deltaMax;
+
+        fundingRatioX96 = OracleLibrary.oracleSqrtPriceX96(
+            delta,
+            PoolConstants.fundingPeriod / 2 // div by 2 given sqrt price result
+        );
     }
 
     /// @inheritdoc IOracle

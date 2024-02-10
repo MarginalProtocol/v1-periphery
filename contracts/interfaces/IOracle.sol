@@ -10,7 +10,7 @@ interface IOracle {
     /// @param poolKey The identifying key of the Marginal v1 pool
     /// @return sqrtPriceX96 The Marginal v1 pool current sqrt price
     /// @return oracleSqrtPriceX96 The oracle sqrt price averaged over pool constant `secondsAgo`
-    /// @return fundingSqrtRatioX96 The current instantaneous sqrt funding rate for long positions on the pool (zeroForOne = false)
+    /// @return fundingRatioX96 The current instantaneous funding rate over next funding period for long positions on the pool (zeroForOne = false)
     function sqrtPricesX96(
         PoolAddress.PoolKey memory poolKey
     )
@@ -19,7 +19,7 @@ interface IOracle {
         returns (
             uint160 sqrtPriceX96,
             uint160 oracleSqrtPriceX96,
-            uint256 fundingSqrtRatioX96
+            uint256 fundingRatioX96
         );
 
     /// @notice Returns the liquidation sqrt price of an existing position
