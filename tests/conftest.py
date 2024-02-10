@@ -243,6 +243,13 @@ def quoter(project, accounts, factory, WETH9, manager, mock_univ3_quoter):
 
 
 @pytest.fixture(scope="session")
+def oracle_lens(project, accounts, factory, WETH9, manager):
+    return project.Oracle.deploy(
+        factory.address, WETH9.address, manager.address, sender=accounts[0]
+    )
+
+
+@pytest.fixture(scope="session")
 def initializer(project, accounts, factory, WETH9):
     return project.PoolInitializer.deploy(
         factory.address, WETH9.address, sender=accounts[0]
@@ -279,6 +286,11 @@ def sqrt_price_math_lib(project, accounts):
 @pytest.fixture(scope="session")
 def liquidity_math_lib(project, accounts):
     return project.MockLiquidityMath.deploy(sender=accounts[0])
+
+
+@pytest.fixture(scope="session")
+def oracle_lib(project, accounts):
+    return project.MockOracleLibrary.deploy(sender=accounts[0])
 
 
 @pytest.fixture(scope="session")

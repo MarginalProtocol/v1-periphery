@@ -81,17 +81,3 @@ def spot_pool_initialized_with_liquidity(
     mock_univ3_pool.setLiquidity(spot_liquidity, sender=sender)
 
     return mock_univ3_pool
-
-
-@pytest.fixture(scope="module")
-def oracle_sqrt_price_initial_x96(
-    pool_initialized_with_liquidity, mock_univ3_pool, oracle_lib
-):
-    seconds_ago = pool_initialized_with_liquidity.secondsAgo()
-    oracle_tick_cumulatives, _ = mock_univ3_pool.observe([seconds_ago, 0])
-    sqrt_price_x96 = oracle_lib.oracleSqrtPriceX96(
-        oracle_tick_cumulatives[0],
-        oracle_tick_cumulatives[1],
-        seconds_ago,
-    )
-    return sqrt_price_x96
