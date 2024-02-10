@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity =0.8.15;
 
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+
 import {Multicall} from "@uniswap/v3-periphery/contracts/base/Multicall.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
 import {FixedPoint96} from "@marginal/v1-core/contracts/libraries/FixedPoint96.sol";
+import {FixedPoint192} from "@marginal/v1-core/contracts/libraries/FixedPoint192.sol";
 import {OracleLibrary} from "@marginal/v1-core/contracts/libraries/OracleLibrary.sol";
+import {SqrtPriceMath} from "@marginal/v1-core/contracts/libraries/SqrtPriceMath.sol";
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
 
 import {PeripheryImmutableState} from "../base/PeripheryImmutableState.sol";
@@ -79,5 +83,55 @@ contract Oracle is IOracle, PeripheryImmutableState, PositionState, Multicall {
     /// @inheritdoc IOracle
     function liquidationSqrtPriceX96(
         uint256 tokenId
-    ) external view returns (uint160) {}
+    ) external view returns (uint160) {
+        (
+            address pool,
+            ,
+            bool zeroForOne,
+            uint128 size,
+            uint128 debt,
+            uint128 margin,
+            ,
+            ,
+            ,
+
+        ) = manager.positions(tokenId);
+        uint24 maintenance = IMarginalV1Pool(pool).maintenance();
+        return
+            liquidationSqrtPriceX96(
+                zeroForOne,
+                size,
+                debt,
+                margin,
+                maintenance
+            );
+    }
+
+    /// @inheritdoc IOracle
+    function liquidationSqrtPriceX96(
+        bool zeroForOne,
+        uint128 size,
+        uint128 debt,
+        uint128 margin,
+        uint24 maintenance
+    ) public pure returns (uint160) {
+        uint256 debtAdjusted = (uint256(debt) * (1e6 + uint256(maintenance))) /
+            1e6;
+        uint256 collateral = uint256(size) + uint256(margin);
+
+        // sqrt(y/x) << 96
+        uint256 num = !zeroForOne ? debtAdjusted : collateral;
+        uint256 denom = !zeroForOne ? collateral : debtAdjusted;
+
+        uint256 sqrtPriceX96 = (
+            num <= type(uint64).max
+                ? Math.sqrt((num << FixedPoint192.RESOLUTION) / denom)
+                : (Math.sqrt(num) << FixedPoint96.RESOLUTION) / Math.sqrt(denom)
+        );
+        if (
+            !(sqrtPriceX96 >= SqrtPriceMath.MIN_SQRT_RATIO &&
+                sqrtPriceX96 < SqrtPriceMath.MAX_SQRT_RATIO)
+        ) revert("Invalid sqrtPriceX96");
+        return uint160(sqrtPriceX96);
+    }
 }

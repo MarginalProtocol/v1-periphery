@@ -28,4 +28,19 @@ interface IOracle {
     function liquidationSqrtPriceX96(
         uint256 tokenId
     ) external view returns (uint160);
+
+    /// @notice Returns the liquidation sqrt price for given position details
+    /// @param zeroForOne Whether position settlement requires debt in of token0 for size + margin out of token1
+    /// @param size The position size on the pool in the margin token
+    /// @param debt The position debt owed to the pool in the non-margin token
+    /// @param margin The margin backing the position on the pool
+    /// @param maintenance The pool minimum maintenance requirement for leverage positions
+    /// @return The liquidation sqrt price X96 that oracle must reach for position to be unsafe
+    function liquidationSqrtPriceX96(
+        bool zeroForOne,
+        uint128 size,
+        uint128 debt,
+        uint128 margin,
+        uint24 maintenance
+    ) external view returns (uint160);
 }
