@@ -62,6 +62,24 @@ def main():
         )
         click.echo(f"Deployed Marginal v1 quoter to {quoter.address}")
 
+    # deploy marginal v1 oracle lens
+    if click.confirm("Deploy Marginal v1 oracle lens?"):
+        manager_address = manager.address if manager is not None else None
+        if manager_address is None:
+            manager_address = click.prompt(
+                "Marginal v1 NFT position manager address", type=str
+            )
+
+        click.echo("Deploying Marginal v1 oracle lens ...")
+        oracle_lens = project.Oracle.deploy(
+            factory_address,
+            weth9_address,
+            manager_address,
+            sender=deployer,
+            publish=publish,
+        )
+        click.echo(f"Deployed Marginal v1 oracle lens to {oracle_lens.address}")
+
     # deploy marginal v1 pool initializer
     if click.confirm("Deploy Marginal v1 pool initializer?"):
         click.echo("Deploying Marginal v1 pool initializer ...")
