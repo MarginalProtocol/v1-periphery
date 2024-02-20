@@ -65,6 +65,12 @@ abstract contract PeripheryPayments is
             TransferHelper.safeTransferETH(recipient, balanceETH);
     }
 
+    /// @notice Wraps balance of native (gas) token in contract to WETH9
+    function wrapETH() internal {
+        if (address(this).balance > 0)
+            IWETH9(WETH9).deposit{value: address(this).balance}();
+    }
+
     /// @notice Pay ERC20 token to recipient
     /// @param token The token to pay
     /// @param payer The entity that must pay

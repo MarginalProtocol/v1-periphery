@@ -296,6 +296,9 @@ abstract contract PositionManagement is
         if (amountOut < params.amountOutMinimum)
             revert AmountOutLessThanMin(amountOut);
         if (amountOut > 0) pay(tokenOut, payer, params.recipient, amountOut);
+
+        // any remaining WETH in contract from liquidation rewards return as ETH
+        unwrapWETH9(0, params.recipient);
     }
 
     /// @inheritdoc IMarginalV1SettleCallback
@@ -312,6 +315,9 @@ abstract contract PositionManagement is
         CallbackValidation.verifyCallback(factory, decoded.poolKey);
 
         if (decoded.payer == address(this)) {
+            // wrap ETH balance from liquidation rewards returned for possible use in settlement
+            wrapETH();
+
             // swap portion of flashed size through spot to repay debt
             bool zeroForOne = amount1Delta > 0; // owe 1 to marginal if true
             IUniswapV3Pool(decoded.poolKey.oracle).swap(

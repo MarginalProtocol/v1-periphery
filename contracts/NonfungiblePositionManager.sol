@@ -388,9 +388,6 @@ contract NonfungiblePositionManager is
 
         _burn(params.tokenId);
 
-        // sweep escrowed ETH rewards to recipient at end of function to avoid re-entrancy with fallback
-        sweepETH(rewards, params.recipient);
-
         emit Ignite(
             params.tokenId,
             msg.sender,
