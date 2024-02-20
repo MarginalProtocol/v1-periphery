@@ -27,11 +27,6 @@ def rando_token_b_address():
 
 
 @pytest.fixture(scope="session")
-def WETH9(project, accounts):
-    return project.WETH9.deploy(sender=accounts[0])
-
-
-@pytest.fixture(scope="session")
 def create_token(project, accounts):
     def create_token(name, decimals=18):
         return project.Token.deploy(name, decimals, sender=accounts[0])
@@ -47,6 +42,11 @@ def token_a(create_token):
 @pytest.fixture(scope="session")
 def token_b(create_token):
     return create_token("B", decimals=18)
+
+
+@pytest.fixture(scope="session")
+def WETH9(project, accounts):
+    return project.WETH9.deploy(sender=accounts[0])
 
 
 @pytest.fixture(scope="session")
@@ -122,11 +122,37 @@ def mock_univ3_pool(
 
 
 @pytest.fixture(scope="session")
+def mock_univ3_pool_with_WETH9(
+    project,
+    accounts,
+    token_a,
+    WETH9,  # token_b has 18 decimals
+    rando_univ3_fee,
+    rando_univ3_observations,
+):
+    univ3_pool = project.MockUniswapV3Pool.deploy(
+        token_a,
+        WETH9,  # @dev WETH9.address should be > token_a.address
+        rando_univ3_fee,
+        sender=accounts[0],
+    )
+
+    for obs in rando_univ3_observations:
+        univ3_pool.pushObservation(*obs, sender=accounts[0])
+
+    slot0 = (1815798575707834854825150601403158, 200804, 287, 7200, 7200, 0, True)
+    univ3_pool.setSlot0(slot0, sender=accounts[0])
+
+    return univ3_pool
+
+
+@pytest.fixture(scope="session")
 def mock_univ3_factory(
     project,
     accounts,
     rando_univ3_pool,
     mock_univ3_pool,
+    mock_univ3_pool_with_WETH9,
 ):
     univ3_factory = project.MockUniswapV3Factory.deploy(sender=accounts[0])
     univ3_factory.setPool(
@@ -143,6 +169,13 @@ def mock_univ3_factory(
         mock_univ3_pool.address,
         sender=accounts[0],
     )  # A/B 0.3% mock spot pool deployed
+    univ3_factory.setPool(
+        mock_univ3_pool_with_WETH9.token0(),
+        mock_univ3_pool_with_WETH9.token1(),
+        mock_univ3_pool_with_WETH9.fee(),
+        mock_univ3_pool_with_WETH9.address,
+        sender=accounts[0],
+    )  # A/WETH9 0.3% mock spot pool deployed
     return univ3_factory
 
 
@@ -206,6 +239,17 @@ def rando_pool(rando_univ3_pool, create_pool):
         rando_univ3_pool.token1(),
         maintenance,
         rando_univ3_pool.fee(),
+    )
+
+
+@pytest.fixture(scope="session")
+def pool_with_WETH9(mock_univ3_pool_with_WETH9, create_pool):
+    maintenance = 250000
+    return create_pool(
+        mock_univ3_pool_with_WETH9.token0(),
+        mock_univ3_pool_with_WETH9.token1(),
+        maintenance,
+        mock_univ3_pool_with_WETH9.fee(),
     )
 
 

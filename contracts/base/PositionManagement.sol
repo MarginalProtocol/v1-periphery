@@ -165,14 +165,21 @@ abstract contract PositionManagement is
         });
         IMarginalV1Pool pool = getPool(poolKey);
 
+        // manager receives flashed out margin and must handle delta in callback
         (margin0, margin1) = pool.adjust(
-            params.recipient,
+            address(this),
             params.id,
             params.marginDelta,
             abi.encode(
                 PositionCallbackData({poolKey: poolKey, payer: msg.sender})
             )
         );
+
+        // sweep any freed margin remaining in contract
+        address tokenOut = margin0 > 0 ? params.token0 : params.token1;
+        uint256 amountOut = balance(tokenOut);
+        if (amountOut > 0)
+            pay(tokenOut, address(this), params.recipient, amountOut);
     }
 
     /// @inheritdoc IMarginalV1AdjustCallback
@@ -187,10 +194,28 @@ abstract contract PositionManagement is
         );
         CallbackValidation.verifyCallback(factory, decoded.poolKey);
 
-        if (amount0Owed > 0)
-            pay(decoded.poolKey.token0, decoded.payer, msg.sender, amount0Owed);
-        if (amount1Owed > 0)
-            pay(decoded.poolKey.token1, decoded.payer, msg.sender, amount1Owed);
+        if (amount0Owed > 0) {
+            uint256 balance0 = balance(decoded.poolKey.token0);
+            if (amount0Owed > balance0)
+                pay(
+                    decoded.poolKey.token0,
+                    decoded.payer,
+                    address(this),
+                    amount0Owed - balance0
+                );
+            pay(decoded.poolKey.token0, address(this), msg.sender, amount0Owed);
+        }
+        if (amount1Owed > 0) {
+            uint256 balance1 = balance(decoded.poolKey.token1);
+            if (amount1Owed > balance1)
+                pay(
+                    decoded.poolKey.token1,
+                    decoded.payer,
+                    address(this),
+                    amount1Owed - balance1
+                );
+            pay(decoded.poolKey.token1, address(this), msg.sender, amount1Owed);
+        }
     }
 
     struct SettleParams {

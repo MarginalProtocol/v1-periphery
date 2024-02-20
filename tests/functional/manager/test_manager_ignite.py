@@ -413,6 +413,7 @@ def test_manager_ignite__emits_ignite(
 
     event = events[0]
     assert event.tokenId == token_id
+    assert event.sender == sender.address
     assert event.recipient == alice.address
     assert event.amountOut == amount_out_recipient
     assert event.rewards == rewards

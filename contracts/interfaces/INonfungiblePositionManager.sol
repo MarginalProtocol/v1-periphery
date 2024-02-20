@@ -85,7 +85,6 @@ interface INonfungiblePositionManager is IERC721 {
         address oracle;
         uint256 tokenId;
         uint128 marginIn;
-        address recipient;
         uint256 deadline;
     }
 
@@ -110,9 +109,7 @@ interface INonfungiblePositionManager is IERC721 {
     /// @notice Removes margin from an existing position
     /// @param params The parameters necessary for removing margin from the position, encoded as `FreeParams` in calldata
     /// @return margin The margin backing the position after calling free
-    function free(
-        FreeParams calldata params
-    ) external payable returns (uint256 margin);
+    function free(FreeParams calldata params) external returns (uint256 margin);
 
     struct BurnParams {
         address token0;
@@ -153,7 +150,7 @@ interface INonfungiblePositionManager is IERC721 {
     /// @return rewards The amount of escrowed liquidation rewards in native (gas) token received after settling position
     function ignite(
         IgniteParams calldata params
-    ) external payable returns (uint256 amountOut, uint256 rewards);
+    ) external returns (uint256 amountOut, uint256 rewards);
 
     struct GrabParams {
         address token0;

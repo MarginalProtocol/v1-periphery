@@ -42,6 +42,7 @@ contract NonfungiblePositionManager is
 
     event Mint(
         uint256 indexed tokenId,
+        address sender,
         address indexed recipient,
         uint256 positionId,
         uint256 size,
@@ -52,32 +53,31 @@ contract NonfungiblePositionManager is
     );
     event Lock(
         uint256 indexed tokenId,
-        address indexed recipient,
+        address indexed sender,
         uint256 marginAfter
     );
     event Free(
         uint256 indexed tokenId,
-        address indexed recipient,
+        address indexed sender,
+        address recipient,
         uint256 marginAfter
     );
     event Burn(
         uint256 indexed tokenId,
-        address indexed recipient,
+        address indexed sender,
+        address recipient,
         uint256 amountIn,
         uint256 amountOut,
         uint256 rewards
     );
     event Ignite(
         uint256 indexed tokenId,
-        address indexed recipient,
+        address indexed sender,
+        address recipient,
         uint256 amountOut,
         uint256 rewards
     );
-    event Grab(
-        uint256 indexed tokenId,
-        address indexed recipient,
-        uint256 rewards
-    );
+    event Grab(uint256 indexed tokenId, address recipient, uint256 rewards);
 
     error Unauthorized();
     error InvalidPoolKey();
@@ -202,6 +202,7 @@ contract NonfungiblePositionManager is
 
         emit Mint(
             tokenId,
+            msg.sender,
             params.recipient,
             positionId,
             size,
@@ -242,14 +243,14 @@ contract NonfungiblePositionManager is
                 token1: params.token1,
                 maintenance: params.maintenance,
                 oracle: params.oracle,
-                recipient: params.recipient,
+                recipient: msg.sender, // rebates to sender if dust leftover
                 id: position.id,
                 marginDelta: int128(params.marginIn)
             })
         );
         margin = margin0 > 0 ? margin0 : margin1;
 
-        emit Lock(params.tokenId, params.recipient, margin);
+        emit Lock(params.tokenId, msg.sender, margin);
     }
 
     /// @inheritdoc INonfungiblePositionManager
@@ -257,7 +258,6 @@ contract NonfungiblePositionManager is
         FreeParams calldata params
     )
         external
-        payable
         onlyApprovedOrOwner(params.tokenId)
         checkDeadline(params.deadline)
         returns (uint256 margin)
@@ -289,7 +289,7 @@ contract NonfungiblePositionManager is
         );
         margin = margin0 > 0 ? margin0 : margin1;
 
-        emit Free(params.tokenId, params.recipient, margin);
+        emit Free(params.tokenId, msg.sender, params.recipient, margin);
     }
 
     /// @inheritdoc INonfungiblePositionManager
@@ -340,6 +340,7 @@ contract NonfungiblePositionManager is
 
         emit Burn(
             params.tokenId,
+            msg.sender,
             params.recipient,
             amountIn,
             amountOut,
@@ -352,7 +353,6 @@ contract NonfungiblePositionManager is
         IgniteParams calldata params
     )
         external
-        payable
         onlyApprovedOrOwner(params.tokenId)
         checkDeadline(params.deadline)
         returns (uint256 amountOut, uint256 rewards)
@@ -391,7 +391,13 @@ contract NonfungiblePositionManager is
         // sweep escrowed ETH rewards to recipient at end of function to avoid re-entrancy with fallback
         sweepETH(rewards, params.recipient);
 
-        emit Ignite(params.tokenId, params.recipient, amountOut, rewards);
+        emit Ignite(
+            params.tokenId,
+            msg.sender,
+            params.recipient,
+            amountOut,
+            rewards
+        );
     }
 
     /// @inheritdoc INonfungiblePositionManager

@@ -281,6 +281,7 @@ def test_manager_burn__emits_burn(
 
     event = events[0]
     assert event.tokenId == token_id
+    assert event.sender == sender.address
     assert event.recipient == alice.address
     assert event.amountIn == amount_in
     assert event.amountOut == amount_out

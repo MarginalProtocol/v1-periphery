@@ -190,9 +190,7 @@ def test_manager_grab__transfers_funds(
     key = get_position_key(manager.address, position_id)
     position = pool_initialized_with_liquidity.positions(key)
 
-    token_out = token0 if not zero_for_one else token1
     amount_out = position.rewards
-
     balancee_pool = pool_initialized_with_liquidity.balance
     balancee_alice = alice.balance
 

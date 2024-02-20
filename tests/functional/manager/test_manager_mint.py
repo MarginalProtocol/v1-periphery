@@ -401,6 +401,7 @@ def test_manager_mint__emits_mint(
     manager,
     zero_for_one,
     sender,
+    alice,
     chain,
     position_lib,
 ):
@@ -433,7 +434,7 @@ def test_manager_mint__emits_mint(
         amount_in_max,
         sqrt_price_limit_x96,
         margin,
-        sender.address,
+        alice.address,
         deadline,
     )
 
@@ -461,7 +462,8 @@ def test_manager_mint__emits_mint(
 
     event = events[0]
     assert event.tokenId == next_id
-    assert event.recipient == sender.address
+    assert event.sender == sender.address
+    assert event.recipient == alice.address
     assert event.positionId == position_id
     assert event.size == position.size
     assert event.debt == debt
@@ -771,7 +773,7 @@ def test_manager_mint__reverts_when_size_less_than_min(
         GAS_LIQUIDATE,
         premium,
     )
-    rewards *= 100  # set much higher since tx going to revert
+    rewards *= 1000  # set much higher since tx going to revert
 
     with reverts(manager.SizeLessThanMin, size=position.size):
         manager.mint(mint_params, sender=sender, value=rewards)
@@ -849,7 +851,7 @@ def test_manager_mint__reverts_when_debt_greater_than_max(
         GAS_LIQUIDATE,
         premium,
     )
-    rewards *= 100  # set much higher since tx going to revert
+    rewards *= 1000  # set much higher since tx going to revert
 
     with reverts(manager.DebtGreaterThanMax, debt=debt):
         manager.mint(mint_params, sender=sender, value=rewards)
@@ -908,7 +910,7 @@ def test_manager_mint__reverts_when_amount_in_greater_than_max(
         GAS_LIQUIDATE,
         premium,
     )
-    rewards *= 100  # set much higher since tx going to revert
+    rewards *= 1000  # set much higher since tx going to revert
 
     amount_in = margin + fees
     amount_in_max = amount_in - 1
