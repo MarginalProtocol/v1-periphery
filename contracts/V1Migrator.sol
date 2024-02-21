@@ -19,7 +19,13 @@ contract V1Migrator is IV1Migrator, PeripheryImmutableState, Multicall {
     address public immutable marginalV1Router;
     address public immutable uniswapV3NonfungiblePositionManager;
 
+    error Unauthorized();
     error LiquidityDeltaGreaterThanMax();
+
+    modifier onlyApprovedOrOwner(uint256 tokenId) {
+        if (!_isApprovedOrOwner(msg.sender, tokenId)) revert Unauthorized();
+        _;
+    }
 
     constructor(
         address _factory,
@@ -35,8 +41,28 @@ contract V1Migrator is IV1Migrator, PeripheryImmutableState, Multicall {
         require(msg.sender == WETH9, "Not WETH9");
     }
 
+    /// @notice Checks whether spender authorized to migrate Uniswap v3 liquidity to Marginal v1
+    /// @dev Ref @openzeppelin/v3.4.2-solc-0.7/contracts/token/ERC721/ERC721.sol#L292
+    /// @param spender The account looking to migrate the Uniswap v3 LP position
+    /// @param tokenId The tokenId of the Uniswap v3 LP position to migrate
+    /// @return Whether the spender is authorized
+    function _isApprovedOrOwner(
+        address spender,
+        uint256 tokenId
+    ) internal view returns (bool) {
+        IUniswapV3NonfungiblePositionManager uniswapV3Manager = IUniswapV3NonfungiblePositionManager(
+                uniswapV3NonfungiblePositionManager
+            );
+        address owner = uniswapV3Manager.ownerOf(tokenId);
+        return (spender == owner ||
+            uniswapV3Manager.isApprovedForAll(owner, spender) ||
+            uniswapV3Manager.getApproved(tokenId) == spender);
+    }
+
     /// @inheritdoc IV1Migrator
-    function migrate(MigrateParams calldata params) external {
+    function migrate(
+        MigrateParams calldata params
+    ) external onlyApprovedOrOwner(params.tokenId) {
         require(params.percentageToMigrate > 0, "Percentage too small");
         require(params.percentageToMigrate <= 100, "Percentage too large");
 

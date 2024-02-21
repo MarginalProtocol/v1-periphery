@@ -1,5 +1,7 @@
 import pytest
 
+from ape import reverts
+
 from utils.constants import MAX_TICK
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96
 
@@ -198,3 +200,51 @@ def test_migrator_migrate_with_univ3__migrates_liquidity(
         pytest.approx(amount1_refunded, rel=1e-2, abs=1)
         == mrglv1_token1.balanceOf(sender.address) - balance1_sender
     )
+
+
+@pytest.mark.integration
+def test_migrator_migrate_with_univ3__reverts_when_unauthorized(
+    mrglv1_migrator,
+    mrglv1_router,
+    univ3_manager,
+    univ3_pool,
+    mrglv1_pool_initialized_with_liquidity,
+    mrglv1_token0,
+    mrglv1_token1,
+    sender,
+    alice,
+    bob,
+    chain,
+    mint_univ3_lp_position,
+):
+    tick_spacing = univ3_pool.tickSpacing()
+    maintenance = mrglv1_pool_initialized_with_liquidity.maintenance()
+
+    tick_upper = MAX_TICK - (MAX_TICK % tick_spacing)
+    tick_lower = -tick_upper
+
+    univ3_lp_token_id = mint_univ3_lp_position(tick_lower, tick_upper)
+    univ3_lp_position = univ3_manager.positions(univ3_lp_token_id)
+
+    # approve v1 migrator to operate with univ3 manager
+    univ3_manager.approve(mrglv1_migrator.address, univ3_lp_token_id, sender=sender)
+
+    # check bob can't frontrun and spend for himself
+    percentage_to_migrate = 100
+    deadline = chain.pending_timestamp + 3600
+    refund_as_eth = False
+    params = (
+        univ3_lp_token_id,
+        univ3_lp_position.liquidity,  # liquidityToRemove
+        0,  # amount{0,1}MinToRemove
+        0,
+        percentage_to_migrate,
+        0,  # amount{0,1}MinToMigrate
+        0,
+        maintenance,
+        bob.address,
+        deadline,
+        refund_as_eth,
+    )
+    with reverts(mrglv1_migrator.Unauthorized):
+        mrglv1_migrator.migrate(params, sender=bob)
