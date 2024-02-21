@@ -242,11 +242,7 @@ contract PoolInitializer is
         int256 amountSpecified = zeroForOne ? amount0Delta : amount1Delta;
         require(amountSpecified > 0);
         amountSpecified += int256(
-            SwapMath.swapFees(
-                uint256(amountSpecified),
-                PoolConstants.fee,
-                false
-            )
+            SwapMath.swapFees(uint256(amountSpecified), PoolConstants.fee, true)
         );
 
         uint256 amountInMaximum = params.amountInMaximum == 0
