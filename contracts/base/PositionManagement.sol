@@ -254,6 +254,9 @@ abstract contract PositionManagement is
                 PositionCallbackData({poolKey: poolKey, payer: msg.sender})
             )
         );
+
+        // any remaining ETH in the contract from payable return to sender
+        refundETH();
     }
 
     struct FlashParams {

@@ -196,8 +196,8 @@ contract NonfungiblePositionManager is
             id: uint96(positionId)
         });
 
-        // sweep any excess ETH from escrowed rewards to sender at end of function to avoid re-entrancy with fallback
-        sweepETH(0, msg.sender);
+        // refund any excess ETH from escrowed rewards to sender at end of function to avoid re-entrancy with fallback
+        refundETH();
 
         emit Mint(
             tokenId,
