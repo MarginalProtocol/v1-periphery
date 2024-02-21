@@ -7,8 +7,8 @@ interface IPeripheryImmutableState {
     /// @return Returns the address of the Marginal V1 factory
     function factory() external view returns (address);
 
-    /// @return Returns the address of the Marginal V1 deployer
-    function deployer() external view returns (address);
+    /// @return Returns the address of the Uniswap V3 factory
+    function uniswapV3Factory() external view returns (address);
 
     /// @return Returns the address of WETH9
     function WETH9() external view returns (address);
