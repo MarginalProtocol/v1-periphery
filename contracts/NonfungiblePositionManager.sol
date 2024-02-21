@@ -316,6 +316,10 @@ contract NonfungiblePositionManager is
             ) != position.pool
         ) revert InvalidPoolKey();
 
+        // @dev delete the position and burn token before settling on pool to avoid re-entrancy view issues
+        delete _positions[params.tokenId];
+        _burn(params.tokenId);
+
         (int256 amount0, int256 amount1, uint256 rewards) = settle(
             SettleParams({
                 token0: params.token0,
@@ -332,11 +336,6 @@ contract NonfungiblePositionManager is
         amountOut = amount0 < 0
             ? uint256(-amount0)
             : (amount1 < 0 ? uint256(-amount1) : 0);
-
-        // @dev ok after settle which has transfer ETH call given lock on all pool functions
-        delete _positions[params.tokenId];
-
-        _burn(params.tokenId);
 
         emit Burn(
             params.tokenId,
@@ -371,6 +370,10 @@ contract NonfungiblePositionManager is
             ) != position.pool
         ) revert InvalidPoolKey();
 
+        // @dev delete the position and burn token before settling on pool to avoid re-entrancy view issues
+        delete _positions[params.tokenId];
+        _burn(params.tokenId);
+
         (amountOut, rewards) = flash(
             FlashParams({
                 token0: params.token0,
@@ -382,11 +385,6 @@ contract NonfungiblePositionManager is
                 amountOutMinimum: params.amountOutMinimum
             })
         );
-
-        // @dev ok after flash which has transfer ETH call given lock on all pool functions
-        delete _positions[params.tokenId];
-
-        _burn(params.tokenId);
 
         emit Ignite(
             params.tokenId,
