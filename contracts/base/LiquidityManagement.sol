@@ -41,6 +41,7 @@ abstract contract LiquidityManagement is
     }
 
     /// @notice Mints liquidity on pool
+    /// @dev Beware of re-entrancy issues given implicit ETH transfer at end of function
     /// @param params The parameters necessary to mint liquidity on the pool
     /// @return shares The amount of LP token shares minted to recipient
     /// @return amount0 The amount of token0 added to the pool reserves
@@ -70,6 +71,9 @@ abstract contract LiquidityManagement is
 
         if (amount0 < params.amount0Min) revert Amount0LessThanMin(amount0);
         if (amount1 < params.amount1Min) revert Amount1LessThanMin(amount1);
+
+        // any remaining ETH in the contract from payable return to sender
+        refundETH();
     }
 
     /// @inheritdoc IMarginalV1MintCallback

@@ -65,6 +65,7 @@ interface IRouter {
     }
 
     /// @notice Swaps as little as possible of one token for `amountOut` of another token
+    /// @dev If a contract sending in native (gas) token, `msg.sender` must implement a `receive()` function to receive any refunded unspent amount in.
     /// @param params The parameters necessary for the swap, encoded as `ExactOutputSingleParams` in calldata
     /// @return amountIn The amount of the input token
     function exactOutputSingle(
@@ -80,6 +81,7 @@ interface IRouter {
     }
 
     /// @notice Swaps as little as possible of one token for `amountOut` of another along the specified path (reversed)
+    /// @dev If a contract sending in native (gas) token, `msg.sender` must implement a `receive()` function to receive any refunded unspent amount in.
     /// @param params The parameters necessary for the multi-hop swap, encoded as `ExactOutputParams` in calldata
     /// @return amountIn The amount of the input token
     function exactOutput(
@@ -87,6 +89,7 @@ interface IRouter {
     ) external payable returns (uint256 amountIn);
 
     /// @notice Adds liquidity, minting on pool
+    /// @dev If a contract sending in native (gas) token, `msg.sender` must implement a `receive()` function to receive any refunded unspent amount in.
     /// @param params The parameters necessary for adding liquidity, encoded as `AddLiquidityParams` in calldata
     /// @return shares The amount of shares minted
     /// @return amount0 The amount of the input token0

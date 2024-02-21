@@ -267,6 +267,10 @@ contract Router is
         // it's technically possible to not receive the full output amount,
         // so if no price limit has been specified, require this possibility away
         if (sqrtPriceLimitX96 == 0) require(amountOutReceived == amountOut);
+
+        // refund any unspent ETH sent in for swap given token exact output specified
+        // @dev Ref jeiwan.net/posts/public-bug-report-uniswap-swaprouter
+        refundETH();
     }
 
     /// @inheritdoc IRouter

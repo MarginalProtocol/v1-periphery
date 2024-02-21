@@ -209,9 +209,88 @@ def test_router_add_liquidity__emits_increase_liquidity(
     assert event.amount1 == amount1
 
 
-# TODO:
-def test_router_add_liquidity__deposits_weth():
-    pass
+def test_router_add_liquidity__deposits_WETH9(
+    pool_with_WETH9_initialized_with_liquidity,
+    router,
+    sender,
+    alice,
+    chain,
+    WETH9,
+    token0_with_WETH9,
+    token1_with_WETH9,
+    liquidity_math_lib,
+    liquidity_amounts_lib,
+):
+    state = pool_with_WETH9_initialized_with_liquidity.state()
+
+    balance0_sender = token0_with_WETH9.balanceOf(sender.address)
+    balance1_sender = token1_with_WETH9.balanceOf(sender.address)
+    balancee_sender = sender.balance
+
+    balance0_pool = token0_with_WETH9.balanceOf(
+        pool_with_WETH9_initialized_with_liquidity.address
+    )
+    balance1_pool = token1_with_WETH9.balanceOf(
+        pool_with_WETH9_initialized_with_liquidity.address
+    )
+
+    balancee_WETH9 = WETH9.balance
+
+    liquidity_delta_desired = (state.liquidity * 5) // 100  # 5% more liquidity added
+    amount0_desired, amount1_desired = liquidity_math_lib.toAmounts(
+        liquidity_delta_desired, state.sqrtPriceX96
+    )
+
+    liquidity_delta = liquidity_amounts_lib.getLiquidityForAmounts(
+        state.sqrtPriceX96, amount0_desired, amount1_desired
+    )
+    amount0, amount1 = liquidity_math_lib.toAmounts(liquidity_delta, state.sqrtPriceX96)
+    amount0 += 1  # @dev rough round up
+    amount1 += 1
+
+    amount0_min = 0
+    amount1_min = 0
+    deadline = chain.pending_timestamp + 3600
+    params = (
+        pool_with_WETH9_initialized_with_liquidity.token0(),
+        pool_with_WETH9_initialized_with_liquidity.token1(),
+        pool_with_WETH9_initialized_with_liquidity.maintenance(),
+        pool_with_WETH9_initialized_with_liquidity.oracle(),
+        alice.address,
+        amount0_desired,
+        amount1_desired,
+        amount0_min,
+        amount1_min,
+        deadline,
+    )
+    value = amount0 if token0_with_WETH9.address == WETH9.address else amount1
+    value = (value * 101) // 100  # add some excess in case pool price moves
+    tx = router.addLiquidity(params, sender=sender, value=value)
+
+    amount0_sender = amount0 if token0_with_WETH9.address != WETH9.address else 0
+    amount1_sender = amount1 if token1_with_WETH9.address != WETH9.address else 0
+    amounte_sender = (
+        amount0 if token0_with_WETH9.address == WETH9.address else amount1
+    )  # router handles refund of excess value
+
+    assert (
+        token0_with_WETH9.balanceOf(sender.address) == balance0_sender - amount0_sender
+    )
+    assert (
+        token0_with_WETH9.balanceOf(pool_with_WETH9_initialized_with_liquidity.address)
+        == balance0_pool + amount0
+    )
+    assert (
+        token1_with_WETH9.balanceOf(sender.address) == balance1_sender - amount1_sender
+    )
+    assert (
+        token1_with_WETH9.balanceOf(pool_with_WETH9_initialized_with_liquidity.address)
+        == balance1_pool + amount1
+    )
+    assert (
+        sender.balance == balancee_sender - amounte_sender - tx.gas_used * tx.gas_price
+    )  # router handles refund of excess value
+    assert WETH9.balance == balancee_WETH9 + amounte_sender
 
 
 def test_router_add_liquidity__reverts_when_past_deadline(

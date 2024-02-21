@@ -57,6 +57,7 @@ interface INonfungiblePositionManager is IERC721 {
     }
 
     /// @notice Mints a new position, opening on pool
+    /// @dev If a contract, `msg.sender` must implement a `receive()` function to receive any refunded excess liquidation rewards in the native (gas) token from the manager.
     /// @param params The parameters necessary for the position mint, encoded as `MintParams` in calldata
     /// @return tokenId The NFT token id associated with the minted position
     /// @return size The position size on the pool in the margin token
@@ -122,6 +123,7 @@ interface INonfungiblePositionManager is IERC721 {
     }
 
     /// @notice Burns an existing position, settling on pool via external payer
+    /// @dev If a contract, `msg.sender` must implement a `receive()` function to receive any refunded excess debt payment in the native (gas) token from the manager.
     /// @param params The parameters necessary for settling the position, encoded as `BurnParams` in calldata
     /// @return amountIn The amount of debt token in used to settle position
     /// @return amountOut The amount of margin token received after settling position
@@ -145,6 +147,7 @@ interface INonfungiblePositionManager is IERC721 {
     }
 
     /// @notice Burns an existing position, settling on pool via swap through spot
+    /// @dev If a contract, `recipient` must implement a `receive()` function to receive any excess liquidation rewards unused by the spot swap in the native (gas) token from the manager.
     /// @param params The parameters necessary for settling the position, encoded as `IgniteParams` in calldata
     /// @return amountOut The amount of margin token received after settling position
     /// @return rewards The amount of escrowed liquidation rewards in native (gas) token received after settling position
