@@ -80,25 +80,6 @@ interface IQuoter {
             uint128 liquidityLockedAfter
         );
 
-    /// @notice Quotes the result of calling NonfungiblePositionManager::grab
-    /// @param params Param inputs to NonfungiblePositionManager::grab
-    /// @dev Reverts if grab would revert
-    /// @return rewards Amount of escrowed liquidation rewards out to liquidator after grabbing the position
-    /// @return liquidityAfter Pool liquidity after grab
-    /// @return sqrtPriceX96After Pool sqrt price after grab
-    /// @return liquidityLockedAfter Pool locked liquidity after grab
-    function quoteGrab(
-        INonfungiblePositionManager.GrabParams calldata params
-    )
-        external
-        view
-        returns (
-            uint256 rewards,
-            uint128 liquidityAfter,
-            uint160 sqrtPriceX96After,
-            uint128 liquidityLockedAfter
-        );
-
     /// @notice Quotes the amountOut result of Router::exactInputSingle
     /// @param params Param inputs to Router::exactInputSingle
     /// @dev Reverts if exactInputSingle would revert

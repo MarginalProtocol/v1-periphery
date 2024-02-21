@@ -77,7 +77,6 @@ contract NonfungiblePositionManager is
         uint256 amountOut,
         uint256 rewards
     );
-    event Grab(uint256 indexed tokenId, address recipient, uint256 rewards);
 
     error Unauthorized();
     error InvalidPoolKey();
@@ -393,43 +392,5 @@ contract NonfungiblePositionManager is
             amountOut,
             rewards
         );
-    }
-
-    /// @inheritdoc INonfungiblePositionManager
-    function grab(
-        GrabParams calldata params
-    )
-        external
-        payable
-        checkDeadline(params.deadline)
-        returns (uint256 rewards)
-    {
-        Position memory position = _positions[params.tokenId];
-        if (
-            address(
-                getPool(
-                    PoolAddress.PoolKey({
-                        token0: params.token0,
-                        token1: params.token1,
-                        maintenance: params.maintenance,
-                        oracle: params.oracle
-                    })
-                )
-            ) != position.pool
-        ) revert InvalidPoolKey();
-
-        rewards = liquidate(
-            LiquidateParams({
-                token0: params.token0,
-                token1: params.token1,
-                maintenance: params.maintenance,
-                oracle: params.oracle,
-                recipient: params.recipient,
-                owner: address(this),
-                id: position.id
-            })
-        );
-
-        emit Grab(params.tokenId, params.recipient, rewards);
     }
 }

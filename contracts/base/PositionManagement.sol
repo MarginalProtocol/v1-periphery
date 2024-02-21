@@ -378,31 +378,4 @@ abstract contract PositionManagement is
                 uint256(amount1Delta)
             );
     }
-
-    struct LiquidateParams {
-        address token0;
-        address token1;
-        uint24 maintenance;
-        address oracle;
-        address recipient;
-        address owner;
-        uint96 id;
-    }
-
-    /// @notice Liquidates a position on pool
-    /// @param params The parameters necessary to liquidate a position on the pool
-    /// @return rewards The amount of escrowed liquidation rewards in native (gas) token received after liquidating the position
-    function liquidate(
-        LiquidateParams memory params
-    ) internal virtual returns (uint256 rewards) {
-        PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
-            token0: params.token0,
-            token1: params.token1,
-            maintenance: params.maintenance,
-            oracle: params.oracle
-        });
-        IMarginalV1Pool pool = getPool(poolKey);
-
-        rewards = pool.liquidate(params.recipient, params.owner, params.id);
-    }
 }

@@ -151,21 +151,4 @@ interface INonfungiblePositionManager is IERC721 {
     function ignite(
         IgniteParams calldata params
     ) external returns (uint256 amountOut, uint256 rewards);
-
-    struct GrabParams {
-        address token0;
-        address token1;
-        uint24 maintenance;
-        address oracle;
-        uint256 tokenId;
-        address recipient;
-        uint256 deadline;
-    }
-
-    /// @notice Grabs an existing position, liquidating on pool
-    /// @param params The parameters necessary for liquidating a position, encoded as `GrabParams` in calldata
-    /// @return rewards The amount of escrowed liquidation rewards in native (gas) token received after liquidating the position
-    function grab(
-        GrabParams calldata params
-    ) external payable returns (uint256 rewards);
 }
