@@ -127,7 +127,7 @@ interface INonfungiblePositionManager is IERC721 {
     /// @param params The parameters necessary for settling the position, encoded as `BurnParams` in calldata
     /// @return amountIn The amount of debt token in used to settle position
     /// @return amountOut The amount of margin token received after settling position
-    /// @return rewards The amount of escrowed liquidation rewards in native (gas) token received after settling position
+    /// @return rewards The amount of escrowed liquidation rewards in native (gas) token released by pool after settling position
     function burn(
         BurnParams calldata params
     )
@@ -150,7 +150,7 @@ interface INonfungiblePositionManager is IERC721 {
     /// @dev If a contract, `recipient` must implement a `receive()` function to receive any excess liquidation rewards unused by the spot swap in the native (gas) token from the manager.
     /// @param params The parameters necessary for settling the position, encoded as `IgniteParams` in calldata
     /// @return amountOut The amount of margin token received after settling position
-    /// @return rewards The amount of escrowed liquidation rewards in native (gas) token received after settling position
+    /// @return rewards The amount of escrowed liquidation rewards in native (gas) token released by pool after settling position
     function ignite(
         IgniteParams calldata params
     ) external returns (uint256 amountOut, uint256 rewards);

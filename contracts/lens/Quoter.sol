@@ -489,6 +489,10 @@ contract Quoter is
             ? uint256(-amount0)
             : (amount1 < 0 ? uint256(-amount1) : 0);
 
+        // if token out is WETH9, liquidation rewards wrapped and used on oracle swap
+        address tokenOut = !position.zeroForOne ? params.token0 : params.token1;
+        if (tokenOut == WETH9) amountOut += position.rewards;
+
         // amount in is debt repaid pulled from oracle Uniswap v3 pool in exact output swap
         bool oracleZeroForOne = amount1 > 0;
         (int256 oracleAmount0, int256 oracleAmount1) = uniswapV3Quoter.quote(

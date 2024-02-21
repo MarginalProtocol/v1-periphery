@@ -274,7 +274,7 @@ abstract contract PositionManagement is
     /// @dev Beware of re-entrancy issues given implicit ETH transfer at end of function
     /// @param params The parameters necessary to flash settle the position on the pool
     /// @return amountOut The amount of margin token received from pool less debts repaid via swapping on spot
-    /// @return rewards The amount of escrowed native (gas) token received after flash settling the position
+    /// @return rewards The amount of escrowed native (gas) token released by pool after flash settling the position
     function flash(
         FlashParams memory params
     ) internal virtual returns (uint256 amountOut, uint256 rewards) {
