@@ -90,7 +90,7 @@ contract NonfungiblePositionManager is
         address _WETH9,
         address _tokenDescriptor_
     )
-        ERC721("Marginal V1 Position Token", "MRGLV1-POS")
+        ERC721("Marginal V1 Position Token", "MARGV1-POS")
         PeripheryImmutableState(_factory, _WETH9)
     {
         _tokenDescriptor = _tokenDescriptor_;

@@ -1,5 +1,6 @@
 import pytest
 
+from ape.utils import ZERO_ADDRESS  # TODO: remove when implement descriptor
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96
 
 
@@ -61,10 +62,14 @@ def mrglv1_factory(project, accounts, univ3_factory):
     )
 
 
+# TODO: descriptor
+
+
 @pytest.fixture(scope="module")
 def mrglv1_manager(project, accounts, mrglv1_factory, WETH9):
+    # TODO: replace zero address with descriptor
     return project.NonfungiblePositionManager.deploy(
-        mrglv1_factory.address, WETH9.address, sender=accounts[0]
+        mrglv1_factory.address, WETH9.address, ZERO_ADDRESS, sender=accounts[0]
     )
 
 
