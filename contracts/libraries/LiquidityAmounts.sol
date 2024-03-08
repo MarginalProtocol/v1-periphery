@@ -6,9 +6,15 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {FixedPoint96} from "@marginal/v1-core/contracts/libraries/FixedPoint96.sol";
 
+/// @title Liquidity amounts library
+/// @notice Calculates liquidity from desired reserve amounts
 library LiquidityAmounts {
     using SafeCast for uint256;
 
+    /// @notice Gets the pool liquidity contribution for a given amount of token0
+    /// @param sqrtPriceX96 The sqrt price of the pool
+    /// @param amount0 The amount of token0
+    /// @return The liquidity contribution
     function getLiquidityForAmount0(
         uint160 sqrtPriceX96,
         uint256 amount0
@@ -17,6 +23,10 @@ library LiquidityAmounts {
             (Math.mulDiv(amount0, sqrtPriceX96, FixedPoint96.Q96)).toUint128();
     }
 
+    /// @notice Gets the pool liquidity contribution for a given amount of token1
+    /// @param sqrtPriceX96 The sqrt price of the pool
+    /// @param amount1 The amount of token1
+    /// @return The liquidity contribution
     function getLiquidityForAmount1(
         uint160 sqrtPriceX96,
         uint256 amount1
@@ -25,6 +35,12 @@ library LiquidityAmounts {
             ((amount1 << FixedPoint96.RESOLUTION) / sqrtPriceX96).toUint128();
     }
 
+    /// @notice Gets the pool liquidity contribution for given amounts of token0 and token1
+    /// @dev Takes the minimum of contributions from either token0 or token1
+    /// @param sqrtPriceX96 The sqrt price of the pool
+    /// @param amount0 The amount of token0
+    /// @param amount1 The amount of token1
+    /// @return liquidity The liquidity contribution
     function getLiquidityForAmounts(
         uint160 sqrtPriceX96,
         uint256 amount0,

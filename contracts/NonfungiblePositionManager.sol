@@ -129,7 +129,6 @@ contract NonfungiblePositionManager is
             uint256 rewards
         )
     {
-        // TODO: check re-entrancy view issues
         Position memory position = _positions[tokenId];
         pool = position.pool;
         positionId = position.id;
