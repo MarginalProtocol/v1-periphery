@@ -1,5 +1,7 @@
 import pytest
 
+from ape.utils import ZERO_ADDRESS  # TODO: remove once descriptor
+
 
 @pytest.fixture(scope="session")
 def admin(accounts):
@@ -258,10 +260,14 @@ def callee(project, accounts):
     return project.TestMarginalV1PoolCallee.deploy(sender=accounts[0])
 
 
+# TODO: descriptor for nft
+
+
 @pytest.fixture(scope="session")
 def manager(project, accounts, factory, WETH9):
+    # TODO: replace zero address with token descriptor once implemented
     return project.NonfungiblePositionManager.deploy(
-        factory.address, WETH9.address, sender=accounts[0]
+        factory.address, WETH9.address, ZERO_ADDRESS, sender=accounts[0]
     )
 
 

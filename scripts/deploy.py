@@ -1,6 +1,7 @@
 import click
 
 from ape import accounts, chain, project
+from ape.utils import ZERO_ADDRESS  # TODO: remove once descriptor implemented
 
 
 def main():
@@ -26,6 +27,7 @@ def main():
         manager = project.NonfungiblePositionManager.deploy(
             factory_address,
             weth9_address,
+            ZERO_ADDRESS,  # TODO: remove once descriptor implemented
             sender=deployer,
             publish=publish,
         )

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.7.5;
 
-import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IERC721Metadata} from "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 
 import {IPeripheryImmutableState} from "./IPeripheryImmutableState.sol";
 import {IPeripheryPayments} from "./IPeripheryPayments.sol";
 
 /// @title The interface of the non-fungible token for Marginal v1 leverage positions
 /// @notice Wraps Marginal v1 leverage positions in a non-fungible token to allow for transfers
-interface INonfungiblePositionManager is IERC721 {
+interface INonfungiblePositionManager is IERC721Metadata {
     /// @notice Returns details of an existing position
     /// @param tokenId The NFT token id associated with the position
     /// @dev Do *NOT* use in callback. Vulnerable to re-entrancy view issues.

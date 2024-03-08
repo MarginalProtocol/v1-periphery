@@ -2,6 +2,7 @@
 pragma solidity =0.8.15;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {IERC721Metadata} from "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {Multicall} from "@uniswap/v3-periphery/contracts/base/Multicall.sol";
@@ -14,6 +15,8 @@ import {PositionManagement} from "./base/PositionManagement.sol";
 import {PositionState} from "./base/PositionState.sol";
 import {PoolAddress} from "./libraries/PoolAddress.sol";
 import {PositionAmounts} from "./libraries/PositionAmounts.sol";
+
+import {INonfungibleTokenPositionDescriptor} from "./interfaces/INonfungibleTokenPositionDescriptor.sol";
 import {INonfungiblePositionManager} from "./interfaces/INonfungiblePositionManager.sol";
 
 /// @title Non-fungible token for Marginal v1 leverage positions
@@ -34,6 +37,7 @@ contract NonfungiblePositionManager is
     mapping(uint256 => Position) private _positions;
 
     uint256 private _nextId = 1;
+    address private immutable _tokenDescriptor;
 
     modifier onlyApprovedOrOwner(uint256 tokenId) {
         if (!_isApprovedOrOwner(msg.sender, tokenId)) revert Unauthorized();
@@ -83,13 +87,28 @@ contract NonfungiblePositionManager is
 
     constructor(
         address _factory,
-        address _WETH9
+        address _WETH9,
+        address _tokenDescriptor_
     )
         ERC721("Marginal V1 Position Token", "MRGLV1-POS")
         PeripheryImmutableState(_factory, _WETH9)
-    {}
+    {
+        _tokenDescriptor = _tokenDescriptor_;
+    }
 
-    // TODO: tokenURI
+    /// @notice Returns the Uniform Resource Identifier (URI) for `tokenId` token
+    /// @param tokenId The NFT token id associated with the position
+    /// @return The URI for the position with given NFT token id
+    function tokenURI(
+        uint256 tokenId
+    ) public view override(ERC721, IERC721Metadata) returns (string memory) {
+        require(_exists(tokenId));
+        return
+            INonfungibleTokenPositionDescriptor(_tokenDescriptor).tokenURI(
+                this,
+                tokenId
+            );
+    }
 
     /// @inheritdoc INonfungiblePositionManager
     function positions(
