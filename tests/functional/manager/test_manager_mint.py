@@ -641,10 +641,105 @@ def test_manager_mint__when_amount_in_max_is_zero(
     assert token_id == 1  # token with ID 1 minted
 
 
-# TODO: new pool with weth9
-@pytest.mark.parametrize("zero_for_one", [True, False])
-def test_manager_mint__deposits_weth(zero_for_one, sender):
-    pass
+def test_manager_mint__deposits_WETH9(
+    pool_with_WETH9_initialized_with_liquidity,
+    manager,
+    sender,
+    alice,
+    chain,
+    WETH9,
+    token0_with_WETH9,
+    token1_with_WETH9,
+    position_lib,
+):
+    state = pool_with_WETH9_initialized_with_liquidity.state()
+    maintenance = pool_with_WETH9_initialized_with_liquidity.maintenance()
+    oracle = pool_with_WETH9_initialized_with_liquidity.oracle()
+
+    # set WETH9 allowance to zero to ensure all payment in ETH
+    WETH9.approve(manager.address, 0, sender=sender)
+
+    zero_for_one = (
+        token1_with_WETH9.address == WETH9.address
+    )  # margin in token1 if true for ETH in
+
+    sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    reserve = reserve1 if zero_for_one else reserve0
+
+    size = reserve * 1 // 100  # 1% of reserves
+    margin = (size * maintenance * 125) // (MAINTENANCE_UNIT * 100)
+    size_min = (size * 80) // 100
+    debt_max = 2**128 - 1
+    amount_in_max = 2**256 - 1
+    deadline = chain.pending_timestamp + 3600
+
+    token = WETH9
+    balance_sender = token.balanceOf(sender.address)
+    balance_pool = token.balanceOf(pool_with_WETH9_initialized_with_liquidity.address)
+
+    balancee_sender = sender.balance
+    balancee_pool = pool_with_WETH9_initialized_with_liquidity.balance
+    balancee_WETH9 = WETH9.balance
+
+    mint_params = (
+        pool_with_WETH9_initialized_with_liquidity.token0(),
+        pool_with_WETH9_initialized_with_liquidity.token1(),
+        maintenance,
+        oracle,
+        zero_for_one,
+        size,
+        size_min,
+        debt_max,
+        amount_in_max,
+        sqrt_price_limit_x96,
+        margin,
+        sender.address,
+        deadline,
+    )
+
+    premium = pool_with_WETH9_initialized_with_liquidity.rewardPremium()
+    base_fee = chain.blocks[-1].base_fee
+    rewards = position_lib.liquidationRewards(
+        base_fee,
+        BASE_FEE_MIN,
+        GAS_LIQUIDATE,
+        premium,
+    )
+    fees = position_lib.fees(size, FEE)
+
+    amounte_in = margin + fees + rewards
+    value = (amounte_in * 101) // 100  # to test refunds excess ETH
+
+    tx = manager.mint(mint_params, sender=sender, value=value)
+
+    position_id = state.totalPositions
+    owner = manager.address
+    key = get_position_key(owner, position_id)
+    position = pool_with_WETH9_initialized_with_liquidity.positions(key)
+    fees = position_lib.fees(position.size, FEE)
+
+    # reset amounts in given gas likely decreased so lower rewards
+    amounte_in = margin + fees + position.rewards
+    value = (amounte_in * 101) // 100  # to test refunds excess ETH
+    amount_in = margin + fees  # in to WETH
+
+    # check balance changes
+    assert (
+        token.balanceOf(sender.address) == balance_sender
+    )  # no WETH change to sender balance
+    assert (
+        token.balanceOf(pool_with_WETH9_initialized_with_liquidity.address)
+        == balance_pool + amount_in
+    )
+    assert sender.balance == balancee_sender - amounte_in - tx.gas_used * tx.gas_price
+    assert (
+        pool_with_WETH9_initialized_with_liquidity.balance
+        == balancee_pool + position.rewards
+    )
+    assert WETH9.balance == balancee_WETH9 + amount_in
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])

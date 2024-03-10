@@ -194,6 +194,9 @@ contract PoolInitializer is
             amount0 = int256(_amount0) + amount0Burned;
             amount1 = int256(_amount1) + amount1Burned;
 
+            // any remaining ETH in the contract from payable return to sender
+            refundETH();
+
             emit PoolInitialize(msg.sender, pool, shares, amount0, amount1);
         }
     }

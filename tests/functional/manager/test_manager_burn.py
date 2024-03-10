@@ -365,6 +365,9 @@ def test_manager_burn__deposits_WETH9(
     key = get_position_key(manager.address, position_id)
     position = pool_with_WETH9_initialized_with_liquidity.positions(key)
 
+    # set WETH9 allowance to zero to ensure all payment in ETH
+    WETH9.approve(manager.address, 0, sender=sender)
+
     rewards = position.rewards
     amount_in = position.debt0 if zero_for_one else position.debt1
     amount_out = position.size + position.margin

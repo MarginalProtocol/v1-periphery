@@ -223,6 +223,9 @@ def test_router_add_liquidity__deposits_WETH9(
 ):
     state = pool_with_WETH9_initialized_with_liquidity.state()
 
+    # set WETH9 allowance to zero to ensure all payment in ETH
+    WETH9.approve(router.address, 0, sender=sender)
+
     balance0_sender = token0_with_WETH9.balanceOf(sender.address)
     balance1_sender = token1_with_WETH9.balanceOf(sender.address)
     balancee_sender = sender.balance

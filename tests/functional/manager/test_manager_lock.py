@@ -279,6 +279,9 @@ def test_manager_lock__deposits_WETH9(
     token = token0_with_WETH9 if not zero_for_one else token1_with_WETH9
     assert token.address == WETH9.address
 
+    # set WETH9 allowance to zero to ensure all payment in ETH
+    WETH9.approve(manager.address, 0, sender=sender)
+
     balancee_sender = sender.balance
     balancee_WETH9 = WETH9.balance
 

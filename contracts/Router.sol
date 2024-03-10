@@ -363,6 +363,10 @@ contract Router is
                 amount1Min: params.amount1Min
             })
         );
+
+        // any remaining ETH in the contract from payable return to sender
+        refundETH();
+
         emit IncreaseLiquidity(shares, liquidityDelta, amount0, amount1);
     }
 

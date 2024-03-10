@@ -227,6 +227,9 @@ def test_router_exact_output_single__deposits_WETH9(
     fee = pool_with_WETH9_initialized_with_liquidity.fee()
     oracle = pool_with_WETH9_initialized_with_liquidity.oracle()
 
+    # set WETH9 allowance to zero to ensure all payment in ETH
+    WETH9.approve(router.address, 0, sender=sender)
+
     # WETH9 in to test ETH deposits
     token_in = WETH9
     token_out = (
