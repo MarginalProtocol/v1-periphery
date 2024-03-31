@@ -19,7 +19,7 @@ library NFTSVG {
         string size;
         string debt;
         string margin;
-        string tokenId;
+        string healthFactor;
         string poolAddress;
         string poolTicker;
     }
@@ -36,9 +36,9 @@ library NFTSVG {
         string marginCard;
         uint256 marginWidth;
         uint256 marginXPosition;
-        string tokenIdCard;
-        uint256 tokenIdWidth;
-        uint256 tokenIdXPosition;
+        string healthCard;
+        uint256 healthWidth;
+        uint256 healthXPosition;
     }
 
     function generateSVG(
@@ -64,10 +64,10 @@ library NFTSVG {
             content: params.margin
         });
 
-        // Generate the position token ID card.
-        (vars.tokenIdWidth, vars.tokenIdCard) = SVGElements.card({
-            cardType: SVGElements.CardType.TOKEN_ID,
-            content: params.tokenId
+        // Generate the position health factor card.
+        (vars.healthWidth, vars.healthCard) = SVGElements.card({
+            cardType: SVGElements.CardType.HEALTH_FACTOR,
+            content: params.healthFactor
         });
 
         unchecked {
@@ -76,15 +76,15 @@ library NFTSVG {
                 vars.sizeWidth +
                 vars.debtWidth +
                 vars.marginWidth +
-                vars.tokenIdWidth +
+                vars.healthWidth +
                 CARD_MARGIN *
                 3;
 
             // Calculate the positions on the X axis based on the following layout:
             //
-            // ______________________ SVG Width (1000px) ____________________
-            // |     |      |      |      |      |        |      |    |     |
-            // | <-> | Size | 16px | Debt | 16px | Margin | 16px | ID | <-> |
+            // ______________________ SVG Width (1000px) ________________________
+            // |     |      |      |      |      |        |      |        |     |
+            // | <-> | Size | 16px | Debt | 16px | Margin | 16px | Health | <-> |
             vars.sizeXPosition = (1000 - vars.cardsWidth) / 2;
             vars.debtXPosition =
                 vars.sizeXPosition +
@@ -94,7 +94,7 @@ library NFTSVG {
                 vars.debtXPosition +
                 vars.debtWidth +
                 CARD_MARGIN;
-            vars.tokenIdXPosition =
+            vars.healthXPosition =
                 vars.marginXPosition +
                 vars.marginWidth +
                 CARD_MARGIN;
@@ -105,7 +105,7 @@ library NFTSVG {
             vars.sizeCard,
             vars.debtCard,
             vars.marginCard,
-            vars.tokenIdCard
+            vars.healthCard
         );
 
         return
@@ -119,7 +119,7 @@ library NFTSVG {
                     vars.sizeXPosition,
                     vars.debtXPosition,
                     vars.marginXPosition,
-                    vars.tokenIdXPosition
+                    vars.healthXPosition
                 ),
                 "</svg>"
             );
@@ -203,7 +203,7 @@ library NFTSVG {
         uint256 sizeXPosition,
         uint256 debtXPosition,
         uint256 marginXPosition,
-        uint256 tokenIdXPosition
+        uint256 healthXPosition
     ) internal pure returns (string memory) {
         return
             string.concat(
@@ -218,8 +218,8 @@ library NFTSVG {
                 '<use href="#Margin" x="',
                 marginXPosition.toString(),
                 '" y="790"/>',
-                '<use href="#ID" x="',
-                tokenIdXPosition.toString(),
+                '<use href="#Health" x="',
+                healthXPosition.toString(),
                 '" y="790"/>'
             );
     }

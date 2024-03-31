@@ -49,7 +49,7 @@ library SVGElements {
         POSITION_SIZE,
         POSITION_DEBT,
         POSITION_MARGIN,
-        TOKEN_ID
+        HEALTH_FACTOR
     }
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -171,7 +171,7 @@ library SVGElements {
         } else if (cardType == CardType.POSITION_MARGIN) {
             return "Margin";
         } else {
-            return "ID";
+            return "Health";
         }
     }
 }

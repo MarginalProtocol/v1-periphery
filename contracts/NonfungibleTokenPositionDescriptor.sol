@@ -44,6 +44,8 @@ contract NonfungibleTokenPositionDescriptor is
         uint256 amountSize;
         uint256 amountDebt;
         uint256 amountMargin;
+        uint256 amountSafeMarginMinimum;
+        string healthFactor;
         address poolAddress;
         string svg;
         string json;
@@ -63,11 +65,15 @@ contract NonfungibleTokenPositionDescriptor is
             vars.amountSize,
             vars.amountDebt,
             vars.amountMargin,
-            ,
+            vars.amountSafeMarginMinimum,
             ,
             ,
 
         ) = positionManager.positions(tokenId);
+        vars.healthFactor = calculateHealthFactor(
+            vars.amountMargin,
+            vars.amountSafeMarginMinimum
+        );
 
         uint24 maintenance = IMarginalV1Pool(vars.poolAddress).maintenance();
         vars.maxLeverageTier = calculateMaximumLeverage(maintenance);
@@ -109,7 +115,7 @@ contract NonfungibleTokenPositionDescriptor is
                     decimals: vars.decimalsSize,
                     unit: vars.symbolSize
                 }),
-                tokenId: tokenId.toString(),
+                healthFactor: vars.healthFactor,
                 poolAddress: vars.poolAddress.toHexString(),
                 poolTicker: generateTicker({
                     quoteTokenSymbol: vars.quoteTokenSymbol,
@@ -338,12 +344,26 @@ contract NonfungibleTokenPositionDescriptor is
         }
     }
 
+    /// @notice Calculates the health factor for a position
+    /// @param margin The position margin
+    /// @param safeMarginMinimum The position safe margin minimum
+    /// @return The health factor, as a string
+    function calculateHealthFactor(
+        uint256 margin,
+        uint256 safeMarginMinimum
+    ) internal pure returns (string memory) {
+        uint256 healthFactor = safeMarginMinimum > 0
+            ? (margin * 100) / safeMarginMinimum
+            : 0;
+        return abbreviateAmount({amount: healthFactor, decimals: 2, unit: ""});
+    }
+
     /// @notice Calculates the maximum leverage for a pool given the maintenance requirement
     /// @param maintenance The maintenance requirement of the pool
     /// @return The string representation of maximum leverage
     function calculateMaximumLeverage(
         uint24 maintenance
-    ) internal view returns (string memory) {
+    ) internal pure returns (string memory) {
         uint256 leverage = 1e6 + 1e12 / uint256(maintenance);
         return
             string.concat(
