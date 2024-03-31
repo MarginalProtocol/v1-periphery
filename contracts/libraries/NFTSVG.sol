@@ -12,7 +12,7 @@ import {SVGElements} from "./SVGElements.sol";
 library NFTSVG {
     using Strings for uint256;
 
-    uint256 internal constant CARD_MARGIN = 16;
+    uint256 internal constant CARD_MARGIN = 20;
 
     struct SVGParams {
         string accentColor;

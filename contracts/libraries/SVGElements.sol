@@ -74,7 +74,7 @@ library SVGElements {
 
         // Use the greater of the two widths, and add the left and the right margin.
         unchecked {
-            width = Math.max(captionWidth, contentWidth) + 40;
+            width = Math.max(captionWidth, contentWidth) + 60;
         }
 
         card_ = string.concat(

@@ -1,7 +1,6 @@
 import click
 
 from ape import accounts, chain, project
-from ape.utils import ZERO_ADDRESS  # TODO: remove once descriptor implemented
 
 
 def main():
@@ -23,11 +22,20 @@ def main():
     # deploy marginal v1 position manager
     manager = None
     if click.confirm("Deploy Marginal v1 NFT position manager?"):
+        click.echo("Deploying Marginal v1 NFT position descriptor ...")
+        descriptor = project.NonfungibleTokenPositionDescriptor.deploy(
+            sender=deployer,
+            publish=publish,
+        )
+        click.echo(
+            f"Deployed Marginal v1 NFT position descriptor to {descriptor.address}"
+        )
+
         click.echo("Deploying Marginal v1 NFT position manager ...")
         manager = project.NonfungiblePositionManager.deploy(
             factory_address,
             weth9_address,
-            ZERO_ADDRESS,  # TODO: remove once descriptor implemented
+            descriptor.address,
             sender=deployer,
             publish=publish,
         )
