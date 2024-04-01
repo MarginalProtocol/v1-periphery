@@ -337,7 +337,7 @@ contract NonfungibleTokenPositionDescriptor is
 
         // The length check is a precautionary measure to help mitigate potential security threats from malicious assets
         // injecting scripts in the symbol string.
-        if (bytes(symbol).length > 30) {
+        if (bytes(symbol).length > 10) {
             return "Long Symbol";
         } else {
             return symbol;
