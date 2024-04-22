@@ -45,6 +45,7 @@ contract NonfungibleTokenPositionDescriptor is
         uint256 amountDebt;
         uint256 amountMargin;
         uint256 amountSafeMarginMinimum;
+        uint256 amountTotalSize;
         string healthFactor;
         address poolAddress;
         string svg;
@@ -70,6 +71,8 @@ contract NonfungibleTokenPositionDescriptor is
             ,
 
         ) = positionManager.positions(tokenId);
+
+        vars.amountTotalSize = vars.amountSize + vars.amountMargin; // safe given both limited to uint128
         vars.healthFactor = calculateHealthFactor(
             vars.amountMargin,
             vars.amountSafeMarginMinimum
@@ -101,7 +104,7 @@ contract NonfungibleTokenPositionDescriptor is
             NFTSVG.SVGParams({
                 accentColor: SVGElements.ACCENT_COLOR,
                 size: abbreviateAmount({
-                    amount: vars.amountSize,
+                    amount: vars.amountTotalSize,
                     decimals: vars.decimalsSize,
                     unit: vars.symbolSize
                 }),
