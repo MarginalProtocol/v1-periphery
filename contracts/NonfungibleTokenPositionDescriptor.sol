@@ -127,7 +127,7 @@ contract NonfungibleTokenPositionDescriptor is
 
         // Generate the JSON metadata.
         vars.json = string.concat(
-            '{"description":',
+            '{"description":"',
             generateDescriptionPartOne({
                 quoteTokenSymbol: vars.quoteTokenSymbol,
                 baseTokenSymbol: vars.baseTokenSymbol,
