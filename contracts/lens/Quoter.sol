@@ -222,6 +222,7 @@ contract Quoter is
             );
             safeMarginMinimum = _safeMarginMinimum(
                 position,
+                marginMinimum,
                 params.maintenance,
                 oracleTickCumulativeDelta
             );
