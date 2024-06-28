@@ -313,6 +313,11 @@ def arbitrageur(project, accounts, factory, WETH9):
 
 
 @pytest.fixture(scope="session")
+def position_viewer(project, accounts):
+    return project.PositionViewer.deploy(sender=accounts[0])
+
+
+@pytest.fixture(scope="session")
 def pool_address_lib(project, accounts):
     return project.MockPoolAddress.deploy(sender=accounts[0])
 

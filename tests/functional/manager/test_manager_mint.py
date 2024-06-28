@@ -172,6 +172,7 @@ def test_manager_mint__sets_position_ref(
     sender,
     chain,
     position_lib,
+    position_viewer,
 ):
     state = pool_initialized_with_liquidity.state()
     maintenance = pool_initialized_with_liquidity.maintenance()
@@ -229,6 +230,21 @@ def test_manager_mint__sets_position_ref(
     assert manager.positions(next_id) == (
         pool_initialized_with_liquidity.address,
         position_id,
+        zero_for_one,
+        position.size,
+        position.debt0 if zero_for_one else position.debt1,
+        position.margin,
+        margin_min,  # oracle tick == pool tick in conftest.py
+        position.liquidated,
+        True,  # should be safe
+        position.rewards,
+    )
+
+    assert position_viewer.positions(
+        pool_initialized_with_liquidity.address,
+        owner,
+        position_id,
+    ) == (
         zero_for_one,
         position.size,
         position.debt0 if zero_for_one else position.debt1,
