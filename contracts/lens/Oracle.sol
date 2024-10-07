@@ -151,4 +151,74 @@ contract Oracle is IOracle, PeripheryImmutableState, PositionState, Multicall {
         ) revert("Invalid sqrtPriceX96");
         return uint160(sqrtPriceX96);
     }
+
+    /// @inheritdoc IOracle
+    function healthFactor(uint256 tokenId) external view returns (uint256) {
+        (
+            address pool,
+            ,
+            bool zeroForOne,
+            uint128 size,
+            uint128 debt,
+            uint128 margin,
+            ,
+            ,
+            ,
+
+        ) = manager.positions(tokenId);
+        uint24 maintenance = IMarginalV1Pool(pool).maintenance();
+
+        int56[] memory oracleTickCumulativesLast = getOracleSynced(pool);
+        uint160 oracleSqrtPriceX96 = OracleLibrary.oracleSqrtPriceX96(
+            OracleLibrary.oracleTickCumulativeDelta(
+                oracleTickCumulativesLast[0],
+                oracleTickCumulativesLast[1] // zero seconds ago
+            ),
+            PoolConstants.secondsAgo
+        );
+
+        return
+            healthFactor(
+                zeroForOne,
+                size,
+                debt,
+                margin,
+                maintenance,
+                oracleSqrtPriceX96
+            );
+    }
+
+    /// @inheritdoc IOracle
+    function healthFactor(
+        bool zeroForOne,
+        uint128 size,
+        uint128 debt,
+        uint128 margin,
+        uint24 maintenance,
+        uint160 sqrtPriceX96
+    ) public pure returns (uint256) {
+        if (!zeroForOne) {
+            uint256 debt1Adjusted = (uint256(debt) *
+                (1e6 + uint256(maintenance))) / 1e6;
+            uint256 liquidityCollateral = Math.mulDiv(
+                uint256(margin) + uint256(size),
+                sqrtPriceX96,
+                FixedPoint96.Q96
+            );
+            uint256 liquidityDebt = (debt1Adjusted << FixedPoint96.RESOLUTION) /
+                sqrtPriceX96;
+            return Math.mulDiv(liquidityCollateral, 1e18, liquidityDebt);
+        } else {
+            uint256 debt0Adjusted = (uint256(debt) *
+                (1e6 + uint256(maintenance))) / 1e6;
+            uint256 liquidityCollateral = ((uint256(margin) + uint256(size)) <<
+                FixedPoint96.RESOLUTION) / sqrtPriceX96;
+            uint256 liquidityDebt = Math.mulDiv(
+                debt0Adjusted,
+                sqrtPriceX96,
+                FixedPoint96.Q96
+            );
+            return Math.mulDiv(liquidityCollateral, 1e18, liquidityDebt);
+        }
+    }
 }
