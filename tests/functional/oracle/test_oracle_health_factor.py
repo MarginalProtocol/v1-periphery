@@ -139,7 +139,7 @@ def test_oracle_health_factor__returns_health_factor(
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
-def test_oracle_health_factor__returns_health_factor_when_liquidation_sqrt_price_x96(
+def test_oracle_health_factor__returns_one_when_liquidation_sqrt_price_x96(
     oracle_lens,
     manager,
     pool_initialized_with_liquidity,
@@ -179,3 +179,75 @@ def test_oracle_health_factor__returns_health_factor_when_liquidation_sqrt_price
         liquidation_sqrt_price_x96,
     )
     assert pytest.approx(result, rel=1e-5) == int(1e18)
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_oracle_health_factor__returns_zero_when_collateral_zero(
+    oracle_lens,
+    manager,
+    pool_initialized_with_liquidity,
+    mock_univ3_pool,
+    oracle_sqrt_price_initial_x96,
+    sender,
+    chain,
+    zero_for_one,
+):
+    state = pool_initialized_with_liquidity.state()
+    maintenance = pool_initialized_with_liquidity.maintenance()
+    pool_key = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        maintenance,
+        pool_initialized_with_liquidity.oracle(),
+    )
+    (_, oracle_sqrt_price_x96, __) = oracle_lens.sqrtPricesX96(pool_key)
+
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    reserve = reserve0 if zero_for_one else reserve1
+    debt = reserve * 1 // 100  # 1% of reserves
+
+    result = oracle_lens.healthFactor(
+        zero_for_one, 0, debt, 0, maintenance, oracle_sqrt_price_x96
+    )
+    assert result == 0
+
+    result_with_zero_debt = oracle_lens.healthFactor(
+        zero_for_one, 0, 0, 0, maintenance, oracle_sqrt_price_x96
+    )
+    assert result_with_zero_debt == 0
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_oracle_health_factor__returns_zero_when_collateral_nonzero_debt_zero(
+    oracle_lens,
+    manager,
+    pool_initialized_with_liquidity,
+    mock_univ3_pool,
+    oracle_sqrt_price_initial_x96,
+    sender,
+    chain,
+    zero_for_one,
+):
+    state = pool_initialized_with_liquidity.state()
+    maintenance = pool_initialized_with_liquidity.maintenance()
+    pool_key = (
+        pool_initialized_with_liquidity.token0(),
+        pool_initialized_with_liquidity.token1(),
+        maintenance,
+        pool_initialized_with_liquidity.oracle(),
+    )
+    (_, oracle_sqrt_price_x96, __) = oracle_lens.sqrtPricesX96(pool_key)
+
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    reserve = reserve1 if zero_for_one else reserve0
+    size = reserve * 1 // 100  # 1% of reserves
+    margin = size // 2
+
+    result = oracle_lens.healthFactor(
+        zero_for_one, size, 0, margin, maintenance, oracle_sqrt_price_x96
+    )
+    assert result == (2**256 - 1)

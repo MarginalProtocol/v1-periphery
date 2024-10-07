@@ -207,7 +207,11 @@ contract Oracle is IOracle, PeripheryImmutableState, PositionState, Multicall {
             );
             uint256 liquidityDebt = (debt1Adjusted << FixedPoint96.RESOLUTION) /
                 sqrtPriceX96;
-            return Math.mulDiv(liquidityCollateral, 1e18, liquidityDebt);
+            return (
+                liquidityDebt > 0
+                    ? Math.mulDiv(liquidityCollateral, 1e18, liquidityDebt)
+                    : (liquidityCollateral > 0 ? type(uint256).max : 0)
+            );
         } else {
             uint256 debt0Adjusted = (uint256(debt) *
                 (1e6 + uint256(maintenance))) / 1e6;
@@ -218,7 +222,11 @@ contract Oracle is IOracle, PeripheryImmutableState, PositionState, Multicall {
                 sqrtPriceX96,
                 FixedPoint96.Q96
             );
-            return Math.mulDiv(liquidityCollateral, 1e18, liquidityDebt);
+            return (
+                liquidityDebt > 0
+                    ? Math.mulDiv(liquidityCollateral, 1e18, liquidityDebt)
+                    : (liquidityCollateral > 0 ? type(uint256).max : 0)
+            );
         }
     }
 }
