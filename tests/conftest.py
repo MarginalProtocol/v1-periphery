@@ -313,8 +313,8 @@ def arbitrageur(project, accounts, factory, WETH9):
 
 
 @pytest.fixture(scope="session")
-def position_viewer(project, accounts):
-    return project.PositionViewer.deploy(sender=accounts[0])
+def position_viewer(project, accounts, oracle_lens):
+    return project.PositionViewer.deploy(oracle_lens.address, sender=accounts[0])
 
 
 @pytest.fixture(scope="session")
