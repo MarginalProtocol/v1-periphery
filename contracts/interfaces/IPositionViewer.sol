@@ -39,4 +39,30 @@ interface IPositionViewer {
             uint256 rewards,
             uint256 healthFactor
         );
+
+    /// @notice Gets pool position synced for funding updates without querying the oracle for `secondsAgo`
+    /// @param pool The pool address position taken out on
+    /// @param recipient The recipient of the position at open
+    /// @param id The position ID stored in the pool for the associated position
+    /// @return zeroForOne Whether position settlement requires debt in of token0 for size + margin out of token1
+    /// @return size The position size on the pool in the margin token
+    /// @return debt The position debt owed to the pool in the non-margin token
+    /// @return margin The margin backing the position on the pool
+    /// @return liquidated Whether the position has been liquidated
+    /// @return rewards The reward available to liquidators when position not safe
+    function getPositionInfoSynced(
+        address pool,
+        address recipient,
+        uint96 id
+    )
+        external
+        view
+        returns (
+            bool zeroForOne,
+            uint128 size,
+            uint128 debt,
+            uint128 margin,
+            bool liquidated,
+            uint256 rewards
+        );
 }
