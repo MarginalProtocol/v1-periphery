@@ -61,6 +61,23 @@ def mint_position(
     yield mint
 
 
+@pytest.fixture
+def oracle_next_obs(mock_univ3_pool):
+    def _oracle_next_obs(seconds_ago: int):
+        next_obs_index = mock_univ3_pool.nextObservationIndex()
+        obs_last = mock_univ3_pool.observations(next_obs_index - 1)
+        obs_before = mock_univ3_pool.observations(next_obs_index - 2)
+        tick = (obs_last[1] - obs_before[1]) // (obs_last[0] - obs_before[0])
+
+        obs_timestamp = obs_last[0] + seconds_ago
+        obs_tick_cumulative = obs_last[1] + (seconds_ago * tick)
+        obs_liquidity_cumulative = obs_last[2]  # @dev irrelevant for test
+        obs = (obs_timestamp, obs_tick_cumulative, obs_liquidity_cumulative, True)
+        return obs
+
+    yield _oracle_next_obs
+
+
 @pytest.mark.parametrize("zero_for_one", [True, False])
 def test_viewer_positions__returns_position(
     oracle_lens,
@@ -85,7 +102,7 @@ def test_viewer_positions__returns_position(
     position = manager.positions(token_id)
 
     result = position_viewer.positions(
-        position.pool, manager.address, position.positionId
+        position.pool, manager.address, position.positionId, SECONDS_AGO
     )
 
     health_factor = oracle_lens.healthFactor(token_id)
@@ -101,3 +118,51 @@ def test_viewer_positions__returns_position(
         health_factor,
     )
     assert result == viewer_position
+
+
+@pytest.mark.parametrize("zero_for_one", [True, False])
+def test_viewer_positions__returns_position_when_seconds_ago_not_pool_constants(
+    oracle_lens,
+    position_viewer,
+    oracle_lib,
+    manager,
+    pool_initialized_with_liquidity,
+    mock_univ3_pool,
+    sender,
+    chain,
+    zero_for_one,
+    mint_position,
+    oracle_next_obs,
+):
+    state = pool_initialized_with_liquidity.state()
+    (reserve0, reserve1) = calc_amounts_from_liquidity_sqrt_price_x96(
+        state.liquidity, state.sqrtPriceX96
+    )
+    reserve = reserve1 if zero_for_one else reserve0
+    size = reserve * 1 // 100  # 1% of reserves
+
+    token_id = mint_position(zero_for_one, size)
+    position = manager.positions(token_id)
+    health_factor = oracle_lens.healthFactor(token_id)
+
+    # add in another mock obs
+    seconds_ago = SECONDS_AGO // 2
+    obs = oracle_next_obs(seconds_ago)
+    mock_univ3_pool.pushObservation(*obs, sender=sender)
+
+    result = position_viewer.positions(
+        position.pool, manager.address, position.positionId, seconds_ago
+    )
+
+    assert result.zeroForOne == position.zeroForOne
+    assert result.size == position.size
+    assert result.debt == position.debt
+    assert result.liquidated == position.liquidated
+    assert result.rewards == position.rewards
+
+    # slightly diff given oracle averaging period
+    assert (
+        pytest.approx(result.safeMarginMinimum, rel=1e-4) == position.safeMarginMinimum
+    )
+    assert result.safe == position.safe
+    assert pytest.approx(result.healthFactor, rel=1e-4) == health_factor

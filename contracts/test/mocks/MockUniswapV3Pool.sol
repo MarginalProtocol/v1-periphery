@@ -80,6 +80,10 @@ contract MockUniswapV3Pool {
         liquidity = _liquidity;
     }
 
+    function nextObservationIndex() external view returns (uint256) {
+        return observationIndex % 65535;
+    }
+
     function pushObservation(
         uint32 blockTimestamp,
         int56 tickCumulative,
