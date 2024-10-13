@@ -9,6 +9,7 @@ from utils.constants import (
     FEE,
     BASE_FEE_MIN,
     GAS_LIQUIDATE,
+    SECONDS_AGO,
 )
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
 
@@ -240,11 +241,23 @@ def test_manager_mint__sets_position_ref(
         position.rewards,
     )
 
-    assert position_viewer.positions(
+    p = position_viewer.positions(
         pool_initialized_with_liquidity.address,
         owner,
         position_id,
-    ) == (
+        SECONDS_AGO,
+    )
+    result = (
+        p.zeroForOne,
+        p.size,
+        p.debt,
+        p.margin,
+        p.safeMarginMinimum,
+        p.liquidated,
+        p.safe,
+        p.rewards,
+    )
+    expect = (
         zero_for_one,
         position.size,
         position.debt0 if zero_for_one else position.debt1,
@@ -254,6 +267,7 @@ def test_manager_mint__sets_position_ref(
         True,  # should be safe
         position.rewards,
     )
+    assert result == expect
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
