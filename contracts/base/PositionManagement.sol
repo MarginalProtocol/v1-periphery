@@ -303,7 +303,7 @@ abstract contract PositionManagement is
         if (amountOut > 0) pay(tokenOut, payer, params.recipient, amountOut);
 
         // any remaining WETH in contract from liquidation rewards return as ETH
-        unwrapWETH9(0, params.recipient);
+        if (params.recipient != address(this)) unwrapWETH9(0, params.recipient);
     }
 
     /// @inheritdoc IMarginalV1SettleCallback

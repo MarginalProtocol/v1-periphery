@@ -4,10 +4,6 @@ pragma solidity >=0.7.5;
 /// @title The interface of the position viewer for Marginal v1 pools
 /// @notice Gets the synced positions on Marginal v1 pools
 interface IPositionViewer {
-    /// @notice Returns the address of the Oracle.sol view contract
-    /// @return The address of the Oracle.sol view contract
-    function oracle() external view returns (address);
-
     /// @notice Returns details of an existing position on pool
     /// @dev `secondsAgo` parameter useful in case extreme oracle observation activity and need to set < PoolConstants.secondsAgo
     /// @param pool The pool address position taken out on
@@ -22,7 +18,7 @@ interface IPositionViewer {
     /// @return liquidated Whether the position has been liquidated
     /// @return safe Whether the position can be liquidated
     /// @return rewards The reward available to liquidators when position not safe
-    /// @return healthFactor The health factor of the position
+    /// @return health The health factor of the position
     function positions(
         address pool,
         address owner,
@@ -40,6 +36,6 @@ interface IPositionViewer {
             bool liquidated,
             bool safe,
             uint256 rewards,
-            uint256 healthFactor
+            uint256 health
         );
 }

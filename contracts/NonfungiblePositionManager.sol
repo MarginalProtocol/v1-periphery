@@ -126,7 +126,8 @@ contract NonfungiblePositionManager is
             uint128 safeMarginMinimum,
             bool liquidated,
             bool safe,
-            uint256 rewards
+            uint256 rewards,
+            uint256 health
         )
     {
         Position memory position = _positions[tokenId];
@@ -140,7 +141,8 @@ contract NonfungiblePositionManager is
             safeMarginMinimum,
             liquidated,
             safe,
-            rewards
+            rewards,
+            health
         ) = getPositionSynced(pool, address(this), positionId);
     }
 

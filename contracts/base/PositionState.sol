@@ -8,6 +8,7 @@ import {OracleLibrary} from "@marginal/v1-core/contracts/libraries/OracleLibrary
 import {IMarginalV1Pool} from "@marginal/v1-core/contracts/interfaces/IMarginalV1Pool.sol";
 
 import {PoolConstants} from "../libraries/PoolConstants.sol";
+import {PositionHealth} from "../libraries/PositionHealth.sol";
 
 abstract contract PositionState {
     using PositionLibrary for PositionLibrary.Info;
@@ -52,26 +53,70 @@ abstract contract PositionState {
 
     /// @notice Gets external oracle tick cumulative values for time deltas: [secondsAgo, 0]
     /// @param pool The pool to get external oracle state for
-    function getOracleSynced(
-        address pool
+    /// @param secondsAgo The seconds ago to average the oracle TWAP over to calculate position safety attributes
+    function _getOracleSynced(
+        address pool,
+        uint32 secondsAgo
     ) internal view returns (int56[] memory oracleTickCumulatives) {
         address oracle = IMarginalV1Pool(pool).oracle();
 
         // zero seconds ago for oracle tickCumulative
         uint32[] memory secondsAgos = new uint32[](2);
-        secondsAgos[0] = PoolConstants.secondsAgo;
+        secondsAgos[0] = secondsAgo;
 
         (oracleTickCumulatives, ) = IUniswapV3Pool(oracle).observe(secondsAgos);
     }
 
-    /// @notice Gets pool position synced for funding updates
+    /// @notice Gets external oracle tick cumulative values for time deltas: [PoolConstants.secondsAgo, 0]
+    /// @param pool The pool to get external oracle state for
+    function getOracleSynced(
+        address pool
+    ) internal view returns (int56[] memory oracleTickCumulatives) {
+        oracleTickCumulatives = _getOracleSynced(
+            pool,
+            PoolConstants.secondsAgo
+        );
+    }
+
+    /// @notice Calculates the minimum margin requirement for the position to remain safe from liquidation
+    /// @dev c_y (safe) >= (1+M) * d_x * max(P, TWAP) - s_y when zeroForOne = true when no funding
+    /// or c_x (safe) >= (1+M) * d_y / min(P, TWAP) - s_x when zeroForOne = false when no funding
+    /// @param info The synced position info
+    /// @param marginMinimum The margin minimum when ignoring funding and liquidation
+    /// @param maintenance The minimum maintenance margin requirement
+    /// @param oracleTickCumulativeDelta The difference in oracle tick cumulatives averaged over to assess position safety with
+    /// @param secondsAgo The seconds ago to average the oracle TWAP over to calculate position safety attributes
+    function _safeMarginMinimum(
+        PositionLibrary.Info memory info,
+        uint128 marginMinimum,
+        uint24 maintenance,
+        int56 oracleTickCumulativeDelta,
+        uint32 secondsAgo
+    ) internal pure returns (uint128 safeMarginMinimum) {
+        int24 positionTick = info.tick;
+        int24 oracleTick = int24(
+            oracleTickCumulativeDelta / int56(uint56(secondsAgo))
+        );
+
+        // change to using oracle tick for safe margin minimum calculation with liquidation and funding
+        info.tick = oracleTick;
+        safeMarginMinimum = info.marginMinimum(maintenance);
+        if (marginMinimum > safeMarginMinimum)
+            safeMarginMinimum = marginMinimum;
+
+        info.tick = positionTick; // in case reuse info, return to actual position tick
+    }
+
+    /// @notice Gets pool position synced for funding updates using oracle TWAP averaged over `secondsAgo`
     /// @param pool The pool the position is on
     /// @param recipient The recipient of the position at open
     /// @param id The position id
-    function getPositionSynced(
+    /// @param secondsAgo The seconds ago to average the oracle TWAP over to calculate position safety attributes
+    function _getPositionSynced(
         address pool,
         address recipient,
-        uint96 id
+        uint96 id,
+        uint32 secondsAgo
     )
         internal
         view
@@ -83,7 +128,8 @@ abstract contract PositionState {
             uint128 safeMarginMinimum,
             bool liquidated,
             bool safe,
-            uint256 rewards
+            uint256 rewards,
+            uint256 health
         )
     {
         PositionLibrary.Info memory info;
@@ -129,6 +175,7 @@ abstract contract PositionState {
 
         uint24 maintenance = IMarginalV1Pool(pool).maintenance();
         uint128 marginMinimum = info.marginMinimum(maintenance);
+        uint160 oracleSqrtPriceX96;
 
         // sync if not settled or liquidated
         if (info.size > 0) {
@@ -145,8 +192,9 @@ abstract contract PositionState {
 
                 ) = getStateSynced(pool);
 
-                int56[] memory oracleTickCumulativesLast = getOracleSynced(
-                    pool
+                int56[] memory oracleTickCumulativesLast = _getOracleSynced(
+                    pool,
+                    secondsAgo
                 );
                 oracleTickCumulativeDelta = OracleLibrary
                     .oracleTickCumulativeDelta(
@@ -163,48 +211,66 @@ abstract contract PositionState {
                 );
             }
 
-            safe = info.safe(
-                OracleLibrary.oracleSqrtPriceX96(
-                    oracleTickCumulativeDelta,
-                    PoolConstants.secondsAgo
-                ),
-                maintenance
+            oracleSqrtPriceX96 = OracleLibrary.oracleSqrtPriceX96(
+                oracleTickCumulativeDelta,
+                secondsAgo
             );
+            safe = info.safe(oracleSqrtPriceX96, maintenance);
             safeMarginMinimum = _safeMarginMinimum(
                 info,
                 marginMinimum,
                 maintenance,
-                oracleTickCumulativeDelta
+                oracleTickCumulativeDelta,
+                secondsAgo
             );
         }
 
         debt = zeroForOne ? info.debt0 : info.debt1;
+        health = oracleSqrtPriceX96 > 0
+            ? PositionHealth.getHealthForPosition(
+                zeroForOne,
+                size,
+                debt,
+                margin,
+                maintenance,
+                oracleSqrtPriceX96
+            )
+            : 0;
     }
 
-    /// @notice Calculates the minimum margin requirement for the position to remain safe from liquidation
-    /// @dev c_y (safe) >= (1+M) * d_x * max(P, TWAP) - s_y when zeroForOne = true when no funding
-    /// or c_x (safe) >= (1+M) * d_y / min(P, TWAP) - s_x when zeroForOne = false when no funding
-    /// @param info The synced position info
-    /// @param marginMinimum The margin minimum when ignoring funding and liquidation
-    /// @param maintenance The minimum maintenance margin requirement
-    /// @param oracleTickCumulativeDelta The difference in oracle tick cumulatives averaged over to assess position safety with
-    function _safeMarginMinimum(
-        PositionLibrary.Info memory info,
-        uint128 marginMinimum,
-        uint24 maintenance,
-        int56 oracleTickCumulativeDelta
-    ) internal pure returns (uint128 safeMarginMinimum) {
-        int24 positionTick = info.tick;
-        int24 oracleTick = int24(
-            oracleTickCumulativeDelta / int56(uint56(PoolConstants.secondsAgo))
-        );
-
-        // change to using oracle tick for safe margin minimum calculation with liquidation and funding
-        info.tick = oracleTick;
-        safeMarginMinimum = info.marginMinimum(maintenance);
-        if (marginMinimum > safeMarginMinimum)
-            safeMarginMinimum = marginMinimum;
-
-        info.tick = positionTick; // in case reuse info, return to actual position tick
+    /// @notice Gets pool position synced for funding updates
+    /// @param pool The pool the position is on
+    /// @param recipient The recipient of the position at open
+    /// @param id The position id
+    function getPositionSynced(
+        address pool,
+        address recipient,
+        uint96 id
+    )
+        internal
+        view
+        returns (
+            bool zeroForOne,
+            uint128 size,
+            uint128 debt,
+            uint128 margin,
+            uint128 safeMarginMinimum,
+            bool liquidated,
+            bool safe,
+            uint256 rewards,
+            uint256 health
+        )
+    {
+        (
+            zeroForOne,
+            size,
+            debt,
+            margin,
+            safeMarginMinimum,
+            liquidated,
+            safe,
+            rewards,
+            health
+        ) = _getPositionSynced(pool, recipient, id, PoolConstants.secondsAgo);
     }
 }

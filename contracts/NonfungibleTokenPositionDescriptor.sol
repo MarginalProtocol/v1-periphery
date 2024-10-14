@@ -45,6 +45,7 @@ contract NonfungibleTokenPositionDescriptor is
         uint256 amountDebt;
         uint256 amountMargin;
         uint256 amountSafeMarginMinimum;
+        uint256 amountHealth;
         uint256 amountTotalSize;
         string healthFactor;
         address poolAddress;
@@ -69,14 +70,12 @@ contract NonfungibleTokenPositionDescriptor is
             vars.amountSafeMarginMinimum,
             ,
             ,
-
+            ,
+            vars.amountHealth
         ) = positionManager.positions(tokenId);
 
         vars.amountTotalSize = vars.amountSize + vars.amountMargin; // safe given both limited to uint128
-        vars.healthFactor = calculateHealthFactor(
-            vars.amountMargin,
-            vars.amountSafeMarginMinimum
-        );
+        vars.healthFactor = calculateHealthFactor(vars.amountHealth);
 
         uint24 maintenance = IMarginalV1Pool(vars.poolAddress).maintenance();
         vars.maxLeverageTier = calculateMaximumLeverage(maintenance);
@@ -348,16 +347,12 @@ contract NonfungibleTokenPositionDescriptor is
     }
 
     /// @notice Calculates the health factor for a position
-    /// @param margin The position margin
-    /// @param safeMarginMinimum The position safe margin minimum
+    /// @param health The health factor multiplied by 1e18
     /// @return The health factor, as a string
     function calculateHealthFactor(
-        uint256 margin,
-        uint256 safeMarginMinimum
+        uint256 health
     ) internal pure returns (string memory) {
-        uint256 healthFactor = safeMarginMinimum > 0
-            ? (margin * 100) / safeMarginMinimum
-            : 0;
+        uint256 healthFactor = health / 1e16;
         return abbreviateAmount({amount: healthFactor, decimals: 2, unit: ""});
     }
 
