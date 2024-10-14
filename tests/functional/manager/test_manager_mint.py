@@ -173,6 +173,7 @@ def test_manager_mint__sets_position_ref(
     sender,
     chain,
     position_lib,
+    position_health_lib,
     position_viewer,
 ):
     state = pool_initialized_with_liquidity.state()
@@ -226,6 +227,14 @@ def test_manager_mint__sets_position_ref(
     position = pool_initialized_with_liquidity.positions(key)
 
     margin_min = position_lib.marginMinimum(position, maintenance)
+    health = position_health_lib.getHealthForPosition(
+        zero_for_one,
+        size,
+        position.debt0 if zero_for_one else position.debt1,
+        position.margin,
+        maintenance,
+        state.sqrtPriceX96,  # oracle tick == pool tick in conftest.py
+    )
 
     next_id = 1
     assert manager.positions(next_id) == (
@@ -239,25 +248,15 @@ def test_manager_mint__sets_position_ref(
         position.liquidated,
         True,  # should be safe
         position.rewards,
+        health,
     )
 
-    p = position_viewer.positions(
+    assert position_viewer.positions(
         pool_initialized_with_liquidity.address,
         owner,
         position_id,
         SECONDS_AGO,
-    )
-    result = (
-        p.zeroForOne,
-        p.size,
-        p.debt,
-        p.margin,
-        p.safeMarginMinimum,
-        p.liquidated,
-        p.safe,
-        p.rewards,
-    )
-    expect = (
+    ) == (
         zero_for_one,
         position.size,
         position.debt0 if zero_for_one else position.debt1,
@@ -266,8 +265,8 @@ def test_manager_mint__sets_position_ref(
         position.liquidated,
         True,  # should be safe
         position.rewards,
+        health,
     )
-    assert result == expect
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])

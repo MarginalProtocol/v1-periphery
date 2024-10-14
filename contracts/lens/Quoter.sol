@@ -21,6 +21,7 @@ import {Path} from "../libraries/Path.sol";
 import {PoolAddress} from "../libraries/PoolAddress.sol";
 import {PoolConstants} from "../libraries/PoolConstants.sol";
 import {PositionAmounts} from "../libraries/PositionAmounts.sol";
+import {PositionHealth} from "../libraries/PositionHealth.sol";
 
 import {INonfungiblePositionManager} from "../interfaces/INonfungiblePositionManager.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
@@ -72,6 +73,7 @@ contract Quoter is
             uint256 safeMarginMinimum,
             uint256 fees,
             bool safe,
+            uint256 health,
             uint128 liquidityAfter,
             uint160 sqrtPriceX96After,
             uint128 liquidityLockedAfter
@@ -211,20 +213,30 @@ contract Quoter is
                     oracleTickCumulativesLast[0],
                     oracleTickCumulativesLast[1]
                 );
+            uint160 oracleSqrtPriceX96 = OracleLibrary.oracleSqrtPriceX96(
+                oracleTickCumulativeDelta,
+                PoolConstants.secondsAgo
+            );
 
             safe = PositionLibrary.safe(
                 position,
-                OracleLibrary.oracleSqrtPriceX96(
-                    oracleTickCumulativeDelta,
-                    PoolConstants.secondsAgo
-                ),
+                oracleSqrtPriceX96,
                 params.maintenance
             );
             safeMarginMinimum = _safeMarginMinimum(
                 position,
                 marginMinimum,
                 params.maintenance,
-                oracleTickCumulativeDelta
+                oracleTickCumulativeDelta,
+                PoolConstants.secondsAgo
+            );
+            health = PositionHealth.getHealthForPosition(
+                params.zeroForOne,
+                uint128(size),
+                uint128(debt),
+                uint128(margin),
+                params.maintenance,
+                oracleSqrtPriceX96
             );
         }
     }
@@ -304,7 +316,7 @@ contract Quoter is
             uint128 liquidityLockedAfter
         )
     {
-        (, uint96 positionId, , , , , , , , ) = manager.positions(
+        (, uint96 positionId, , , , , , , , , ) = manager.positions(
             params.tokenId
         );
         IMarginalV1Pool pool = getPool(
@@ -406,7 +418,7 @@ contract Quoter is
             uint128 liquidityLockedAfter
         )
     {
-        (, uint96 positionId, , , , , , , , ) = manager.positions(
+        (, uint96 positionId, , , , , , , , , ) = manager.positions(
             params.tokenId
         );
         IMarginalV1Pool pool = getPool(

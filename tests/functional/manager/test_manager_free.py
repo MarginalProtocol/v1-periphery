@@ -133,7 +133,9 @@ def test_manager_free__adjusts_position(
     alice,
     chain,
     mock_univ3_pool,
+    oracle_sqrt_price_initial_x96,
     position_lib,
+    position_health_lib,
     mint_position,
 ):
     token_id = mint_position(zero_for_one)
@@ -161,7 +163,17 @@ def test_manager_free__adjusts_position(
     rewards = position.rewards
 
     position.margin -= margin_out
+    health = position_health_lib.getHealthForPosition(
+        zero_for_one,
+        position.size,
+        position.debt0 if zero_for_one else position.debt1,
+        position.margin,
+        maintenance,
+        oracle_sqrt_price_initial_x96,
+    )
+
     assert pool_initialized_with_liquidity.positions(key) == position
+
     assert manager.positions(token_id) == (
         pool_initialized_with_liquidity.address,
         position_id,
@@ -173,6 +185,7 @@ def test_manager_free__adjusts_position(
         position.liquidated,
         True,  # should be safe
         rewards,
+        health,
     )
 
 

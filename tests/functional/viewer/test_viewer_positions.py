@@ -80,12 +80,10 @@ def oracle_next_obs(mock_univ3_pool):
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
 def test_viewer_positions__returns_position(
-    oracle_lens,
+    pool_initialized_with_liquidity,
     position_viewer,
     manager,
-    pool_initialized_with_liquidity,
     mock_univ3_pool,
-    oracle_sqrt_price_initial_x96,
     sender,
     chain,
     zero_for_one,
@@ -100,12 +98,10 @@ def test_viewer_positions__returns_position(
 
     token_id = mint_position(zero_for_one, size)
     position = manager.positions(token_id)
-
     result = position_viewer.positions(
         position.pool, manager.address, position.positionId, SECONDS_AGO
     )
 
-    health_factor = oracle_lens.healthFactor(token_id)
     viewer_position = (
         position.zeroForOne,
         position.size,
@@ -115,18 +111,17 @@ def test_viewer_positions__returns_position(
         position.liquidated,
         position.safe,
         position.rewards,
-        health_factor,
+        position.health,
     )
     assert result == viewer_position
 
 
 @pytest.mark.parametrize("zero_for_one", [True, False])
 def test_viewer_positions__returns_position_when_seconds_ago_not_pool_constants(
-    oracle_lens,
+    pool_initialized_with_liquidity,
     position_viewer,
     oracle_lib,
     manager,
-    pool_initialized_with_liquidity,
     mock_univ3_pool,
     sender,
     chain,
@@ -143,7 +138,6 @@ def test_viewer_positions__returns_position_when_seconds_ago_not_pool_constants(
 
     token_id = mint_position(zero_for_one, size)
     position = manager.positions(token_id)
-    health_factor = oracle_lens.healthFactor(token_id)
 
     # add in another mock obs
     seconds_ago = SECONDS_AGO // 2
@@ -165,4 +159,4 @@ def test_viewer_positions__returns_position_when_seconds_ago_not_pool_constants(
         pytest.approx(result.safeMarginMinimum, rel=1e-4) == position.safeMarginMinimum
     )
     assert result.safe == position.safe
-    assert pytest.approx(result.healthFactor, rel=1e-4) == health_factor
+    assert result.health == position.health
