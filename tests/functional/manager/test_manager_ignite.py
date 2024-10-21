@@ -642,6 +642,133 @@ def test_manager_ignite__swaps_WETH9(
     assert pool_with_WETH9_initialized_with_liquidity.balance == balancee_pool - rewards
 
 
+def test_manager_ignite__withdraws_WETH9(
+    spot_pool_with_WETH9_initialized_with_liquidity,
+    pool_with_WETH9_initialized_with_liquidity,
+    manager,
+    sender,
+    alice,
+    chain,
+    sqrt_price_math_lib,
+    swap_math_lib,
+    WETH9,
+    token0_with_WETH9,
+    token1_with_WETH9,
+    mint_position_with_WETH9,
+):
+    zero_for_one = (
+        token1_with_WETH9.address == WETH9.address
+    )  # margin in token1 if true
+    token_id = mint_position_with_WETH9(zero_for_one)
+    position_id = pool_with_WETH9_initialized_with_liquidity.state().totalPositions - 1
+
+    spot_slot0 = spot_pool_with_WETH9_initialized_with_liquidity.slot0()
+    spot_liquidity = spot_pool_with_WETH9_initialized_with_liquidity.liquidity()
+    spot_fee = spot_pool_with_WETH9_initialized_with_liquidity.fee()
+
+    key = get_position_key(manager.address, position_id)
+    position = pool_with_WETH9_initialized_with_liquidity.positions(key)
+    rewards = position.rewards
+
+    token_out = token0_with_WETH9 if not zero_for_one else token1_with_WETH9
+    token_in = token1_with_WETH9 if not zero_for_one else token0_with_WETH9
+    assert token_out.address == WETH9.address
+
+    amount_in = (
+        position.debt0 if zero_for_one else position.debt1
+    )  # out from spot pool to repay
+    amount_out = position.size + position.margin
+
+    # calculate amount out from spot pool to subtract from amount_out
+    amount_specified = -amount_in
+    sqrt_price_x96_next = sqrt_price_math_lib.sqrtPriceX96NextSwap(
+        spot_liquidity,
+        spot_slot0.sqrtPriceX96,
+        (not zero_for_one),  # if debt in is 0 to marginal, need 0 out from spot
+        amount_specified,
+    )
+
+    (spot_amount0, spot_amount1) = swap_math_lib.swapAmounts(
+        spot_liquidity,
+        spot_slot0.sqrtPriceX96,
+        sqrt_price_x96_next,
+    )
+    if zero_for_one:
+        # zero debt into marginal means zero taken out of spot pool to repay (1 into spot)
+        spot_amount1 += swap_math_lib.swapFees(spot_amount1, spot_fee, True)
+    else:
+        # one debt into marginal means one taken out of spot pool to repay (0 into spot)
+        spot_amount0 += swap_math_lib.swapFees(spot_amount0, spot_fee, True)
+
+    spot_amount_in = spot_amount1 if zero_for_one else spot_amount0
+
+    # adjust amount out based off spot swap amount in required to repay debt
+    # @dev should now include liquidation rewards converted to WETH9
+    amount_out_recipient = amount_out - spot_amount_in + rewards
+
+    # cache balances before ignite
+    balance_out_alice = token_out.balanceOf(alice.address)
+    balance_out_pool = token_out.balanceOf(
+        pool_with_WETH9_initialized_with_liquidity.address
+    )
+    balance_out_spot_pool = token_out.balanceOf(
+        spot_pool_with_WETH9_initialized_with_liquidity.address
+    )
+
+    balance_in_pool = token_in.balanceOf(
+        pool_with_WETH9_initialized_with_liquidity.address
+    )
+    balance_in_spot_pool = token_in.balanceOf(
+        spot_pool_with_WETH9_initialized_with_liquidity.address
+    )
+
+    balancee_alice = alice.balance
+    balancee_pool = pool_with_WETH9_initialized_with_liquidity.balance
+
+    deadline = chain.pending_timestamp + 3600
+    amount_out_min = 0
+
+    ignite_params = (
+        pool_with_WETH9_initialized_with_liquidity.token0(),
+        pool_with_WETH9_initialized_with_liquidity.token1(),
+        pool_with_WETH9_initialized_with_liquidity.maintenance(),
+        pool_with_WETH9_initialized_with_liquidity.oracle(),
+        token_id,
+        amount_out_min,
+        manager.address,  # recipient is manager then unwrap to alice
+        deadline,
+    )
+    calldata = [
+        manager.ignite.as_transaction(ignite_params, sender=sender).data,
+        manager.unwrapWETH9.as_transaction(
+            amount_out_min, alice.address, sender=sender
+        ).data,
+    ]
+    manager.multicall(calldata, sender=sender)
+
+    assert token_out.balanceOf(alice.address) == balance_out_alice  # nothing in WETH9
+    assert (
+        token_out.balanceOf(pool_with_WETH9_initialized_with_liquidity.address)
+        == balance_out_pool - amount_out
+    )
+    assert (
+        token_in.balanceOf(pool_with_WETH9_initialized_with_liquidity.address)
+        == balance_in_pool + amount_in
+    )
+    assert (
+        token_out.balanceOf(spot_pool_with_WETH9_initialized_with_liquidity.address)
+        == balance_out_spot_pool + spot_amount_in
+    )
+    assert (
+        token_in.balanceOf(spot_pool_with_WETH9_initialized_with_liquidity.address)
+        == balance_in_spot_pool - amount_in
+    )
+    assert (
+        alice.balance == balancee_alice + amount_out_recipient
+    )  # all amount out withdrawn to native ETH
+    assert pool_with_WETH9_initialized_with_liquidity.balance == balancee_pool - rewards
+
+
 @pytest.mark.parametrize("zero_for_one", [True, False])
 def test_manager_ignite__reverts_when_not_owner(
     pool_initialized_with_liquidity,

@@ -16,6 +16,7 @@ interface IQuoter {
     /// @return safeMarginMinimum The minimum margin requirements necessary to open position on pool while also being safe from liquidation
     /// @return fees Amount of fees in margin token paid to open the position
     /// @return safe Whether the position will be safe given current oracle price averaged over seconds ago
+    /// @return health The health factor of the position to be opened multiplied by 1e18
     /// @return liquidityAfter Pool liquidity after mint
     /// @return sqrtPriceX96After Pool sqrt price after mint
     /// @return liquidityLockedAfter Pool locked liquidity after mint
@@ -31,6 +32,7 @@ interface IQuoter {
             uint256 safeMarginMinimum,
             uint256 fees,
             bool safe,
+            uint256 health,
             uint128 liquidityAfter,
             uint160 sqrtPriceX96After,
             uint128 liquidityLockedAfter

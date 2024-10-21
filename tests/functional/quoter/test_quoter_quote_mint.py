@@ -89,6 +89,7 @@ def test_quoter_quote_mint__quotes_mint(
     assert result.size == position.size
     assert result.debt == position.debt
     assert result.safe is True
+    assert result.health == position.health
 
     fees = position_lib.fees(position.size, FEE)
     assert result.fees == fees
@@ -127,7 +128,7 @@ def test_quoter_quote_mint__quotes_mint_with_oracle_tick_near_liquidation(
 
     # push oracle observation so headed toward liquidation
     tick_next = (
-        state.tick + 10 if zero_for_one else state.tick - 10
+        state.tick + 250 if zero_for_one else state.tick - 250
     )  # oracle 10 bps closer to liq than pool
     obs = get_oracle_next_obs(tick_next)
     mock_univ3_pool.pushObservation(*obs, sender=sender)
@@ -176,6 +177,9 @@ def test_quoter_quote_mint__quotes_mint_with_oracle_tick_near_liquidation(
     manager.mint(mint_params, sender=sender, value=value)
 
     id = 0  # starts at 0 for pool ID
+    next_id = 1  # starts at 1 for nft position manager
+    position = manager.positions(next_id)
+
     key = get_position_key(manager.address, id)
     info = pool_initialized_with_liquidity.positions(key)
     info.tick = tick_next
@@ -183,6 +187,7 @@ def test_quoter_quote_mint__quotes_mint_with_oracle_tick_near_liquidation(
     assert (
         result.safeMarginMinimum == safe_margin_min
     )  # oracle tick == pool tick in conftest.py
+    assert result.health == position.health
 
 
 # TODO: test revert statements

@@ -1,6 +1,8 @@
 import pytest
 
 from ape.utils import ZERO_ADDRESS  # TODO: remove when implement descriptor
+
+from utils.constants import MIN_SQRT_RATIO, MAX_SQRT_RATIO
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96
 
 
@@ -200,12 +202,38 @@ def mrglv1_token1(
 
 @pytest.fixture(scope="module")
 def mrglv1_pool_initialized_with_liquidity(
-    mrglv1_pool, univ3_pool, callee, mrglv1_token0, mrglv1_token1, mrglv1_router, sender
+    mrglv1_pool,
+    univ3_pool,
+    callee,
+    mrglv1_token0,
+    mrglv1_token1,
+    mrglv1_router,
+    swap_math_lib,
+    sender,
 ):
     spot_liquidity = univ3_pool.liquidity()
     liquidity_delta = spot_liquidity * 100 // 10000  # 1% of spot reserves
 
     callee.mint(mrglv1_pool.address, sender.address, liquidity_delta, sender=sender)
+
+    # swap to current univ3 slot0 price (roughly)
+    state = mrglv1_pool.state()
+    slot0 = univ3_pool.slot0()
+    (amount0, amount1) = swap_math_lib.swapAmounts(
+        state.liquidity, state.sqrtPriceX96, slot0.sqrtPriceX96
+    )
+    zero_for_one = amount0 > 0
+    amount_specified = amount0 if zero_for_one else amount1
+    sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
+    callee.swap(
+        mrglv1_pool.address,
+        sender.address,
+        zero_for_one,
+        amount_specified,
+        sqrt_price_limit_x96,
+        sender=sender,
+    )
+
     mrglv1_pool.approve(mrglv1_pool.address, 2**256 - 1, sender=sender)
     mrglv1_pool.approve(mrglv1_router.address, 2**256 - 1, sender=sender)
     return mrglv1_pool

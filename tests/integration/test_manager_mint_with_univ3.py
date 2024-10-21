@@ -6,6 +6,7 @@ from utils.constants import (
     MAINTENANCE_UNIT,
     BASE_FEE_MIN,
     GAS_LIQUIDATE,
+    SECONDS_AGO,
 )
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
 
@@ -19,8 +20,10 @@ def test_manager_mint_with_univ3__opens_position(
     zero_for_one,
     sender,
     chain,
+    oracle_lib,
     position_lib,
     position_amounts_lib,
+    position_health_lib,
 ):
     state = mrglv1_pool_initialized_with_liquidity.state()
     maintenance = mrglv1_pool_initialized_with_liquidity.maintenance()
@@ -66,12 +69,19 @@ def test_manager_mint_with_univ3__opens_position(
 
     tx = mrglv1_manager.mint(mint_params, sender=sender, value=rewards)
 
-    oracle_tick_cumulatives, _ = univ3_pool.observe([0])
-    oracle_tick_cumulative = oracle_tick_cumulatives[0]
+    oracle_tick_cumulatives, _ = univ3_pool.observe([SECONDS_AGO, 0])
+    oracle_tick_cumulative = oracle_tick_cumulatives[1]
     state_tick_cumulative = (
         mrglv1_pool_initialized_with_liquidity.state().tickCumulative
     )
     tick_cumulative_delta = oracle_tick_cumulative - state_tick_cumulative
+
+    oracle_tick_cumulative_delta = (
+        oracle_tick_cumulatives[1] - oracle_tick_cumulatives[0]
+    )
+    oracle_sqrt_price_x96 = oracle_lib.oracleSqrtPriceX96(
+        oracle_tick_cumulative_delta, SECONDS_AGO
+    )
 
     events = tx.decode_logs(mrglv1_manager.Mint)
     assert len(events) == 1
@@ -86,6 +96,16 @@ def test_manager_mint_with_univ3__opens_position(
     key = get_position_key(mrglv1_manager.address, position.positionId)
     info = mrglv1_pool_initialized_with_liquidity.positions(key)
     assert info.tickCumulativeDelta == tick_cumulative_delta
+
+    health = position_health_lib.getHealthForPosition(
+        info.zeroForOne,
+        info.size,
+        info.debt0 if info.zeroForOne else info.debt1,
+        info.margin,
+        maintenance,
+        oracle_sqrt_price_x96,
+    )
+    assert position.health == health
 
 
 @pytest.mark.integration
