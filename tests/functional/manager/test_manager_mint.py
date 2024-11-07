@@ -9,6 +9,7 @@ from utils.constants import (
     FEE,
     BASE_FEE_MIN,
     GAS_LIQUIDATE,
+    SECONDS_AGO,
 )
 from utils.utils import calc_amounts_from_liquidity_sqrt_price_x96, get_position_key
 
@@ -172,6 +173,7 @@ def test_manager_mint__sets_position_ref(
     sender,
     chain,
     position_lib,
+    position_health_lib,
     position_viewer,
 ):
     state = pool_initialized_with_liquidity.state()
@@ -225,6 +227,14 @@ def test_manager_mint__sets_position_ref(
     position = pool_initialized_with_liquidity.positions(key)
 
     margin_min = position_lib.marginMinimum(position, maintenance)
+    health = position_health_lib.getHealthForPosition(
+        zero_for_one,
+        size,
+        position.debt0 if zero_for_one else position.debt1,
+        position.margin,
+        maintenance,
+        state.sqrtPriceX96,  # oracle tick == pool tick in conftest.py
+    )
 
     next_id = 1
     assert manager.positions(next_id) == (
@@ -238,12 +248,14 @@ def test_manager_mint__sets_position_ref(
         position.liquidated,
         True,  # should be safe
         position.rewards,
+        health,
     )
 
     assert position_viewer.positions(
         pool_initialized_with_liquidity.address,
         owner,
         position_id,
+        SECONDS_AGO,
     ) == (
         zero_for_one,
         position.size,
@@ -253,6 +265,7 @@ def test_manager_mint__sets_position_ref(
         position.liquidated,
         True,  # should be safe
         position.rewards,
+        health,
     )
 
 

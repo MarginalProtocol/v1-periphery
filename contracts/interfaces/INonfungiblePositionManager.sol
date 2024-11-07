@@ -22,6 +22,7 @@ interface INonfungiblePositionManager is IERC721Metadata {
     /// @return liquidated Whether the position has been liquidated
     /// @return safe Whether the position can be liquidated
     /// @return rewards The reward available to liquidators when position not safe
+    /// @return health The health factor of position multiplied by 1e18
     function positions(
         uint256 tokenId
     )
@@ -37,7 +38,8 @@ interface INonfungiblePositionManager is IERC721Metadata {
             uint128 safeMarginMinimum,
             bool liquidated,
             bool safe,
-            uint256 rewards
+            uint256 rewards,
+            uint256 health
         );
 
     struct MintParams {
