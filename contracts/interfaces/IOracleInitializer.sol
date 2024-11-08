@@ -10,6 +10,10 @@ interface IOracleInitializer {
     /// @return The gas rebate
     function rebate() external view returns (uint256);
 
+    /// @notice Returns the delta in observation cardinality next
+    /// @return The delta in observation cardinality next
+    function observationCardinalityNextDelta() external view returns (uint16);
+
     /// @notice Returns the amount of native gas token escrowed for Uniswap v3 pool oracle initialization
     /// @return The amount of native gas token escrowed
     function balances(address pool) external view returns (uint256);
@@ -21,11 +25,9 @@ interface IOracleInitializer {
     /// @notice Increases the next observation cardinality on a Uniswap v3 pool oracle
     /// @param poolKey The Uniswap v3 pool key
     /// @param recipient The recipient of the gas rebate for increasing the cardinality
-    /// @param observationCardinalityNext The next observation cardinality to set the Uniswap v3 pool to
     function increase(
         PoolAddress.PoolKey calldata poolKey,
-        address recipient,
-        uint16 observationCardinalityNext
+        address recipient
     ) external;
 
     /// @notice Returns the seconds remaining until a Uniswap v3 pool oracle has fully initialized

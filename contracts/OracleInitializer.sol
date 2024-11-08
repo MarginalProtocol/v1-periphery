@@ -19,7 +19,8 @@ import {IOracleInitializer} from "./interfaces/IOracleInitializer.sol";
 contract OracleInitializer is IOracleInitializer, PeripheryImmutableState {
     /// @inheritdoc IOracleInitializer
     uint256 public immutable rebate;
-
+    /// @inheritdoc IOracleInitializer
+    uint16 public immutable observationCardinalityNextDelta;
     /// @inheritdoc IOracleInitializer
     mapping(address => uint256) public balances;
 
@@ -36,9 +37,11 @@ contract OracleInitializer is IOracleInitializer, PeripheryImmutableState {
     constructor(
         address _factory,
         address _WETH9,
-        uint256 _rebate
+        uint256 _rebate,
+        uint16 _observationCardinalityNextDelta
     ) PeripheryImmutableState(_factory, _WETH9) {
         rebate = _rebate;
+        observationCardinalityNextDelta = _observationCardinalityNextDelta;
     }
 
     /// @dev Returns the Uniswap v3 pool for the given token pair and fee tier. Reverts if pool contract does not exist.
@@ -65,8 +68,7 @@ contract OracleInitializer is IOracleInitializer, PeripheryImmutableState {
     /// @inheritdoc IOracleInitializer
     function increase(
         PoolAddress.PoolKey calldata poolKey,
-        address recipient,
-        uint16 observationCardinalityNext
+        address recipient
     ) external {
         address pool = getPoolAddress(
             poolKey.token0,
@@ -75,9 +77,14 @@ contract OracleInitializer is IOracleInitializer, PeripheryImmutableState {
         );
 
         balances[pool] -= rebate;
+
+        (, , , , uint16 observationCardinalityNext, , ) = IUniswapV3Pool(pool)
+            .slot0();
         IUniswapV3Pool(pool).increaseObservationCardinalityNext(
-            observationCardinalityNext
+            observationCardinalityNextDelta
         );
+        observationCardinalityNext += observationCardinalityNextDelta;
+
         // rebate at end of function to avoid re-entrancy with fallback
         TransferHelper.safeTransferETH(recipient, rebate);
 
