@@ -41,7 +41,7 @@ dependencies:
     ref: 0.8
   - name: marginal-v1-core
     github: MarginalProtocol/v1-core
-    ref: v1.0.1
+    ref: v1.0.2
 
 solidity:
   via_ir: true
@@ -49,4 +49,4 @@ solidity:
     - "@openzeppelin/contracts=openzeppelin/v4.8.3"
     - "@uniswap/v3-core/contracts=uniswap-v3-core/v0.8"
     - "@uniswap/v3-periphery/contracts=uniswap-v3-periphery/v0.8"
-    - "@marginal/v1-core/contracts=marginal-v1-core/v1.0.1"
+    - "@marginal/v1-core/contracts=marginal-v1-core/v1.0.2"
