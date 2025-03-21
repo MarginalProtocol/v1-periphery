@@ -38,7 +38,7 @@ contract MockUniswapV3Pool {
         uint16 observationCardinalityNext;
         // the current protocol fee as a percentage of the swap fee taken on withdrawal
         // represented as an integer denominator (1/x)%
-        uint8 feeProtocol;
+        uint32 feeProtocol;
         // whether the pool is locked
         bool unlocked;
     }

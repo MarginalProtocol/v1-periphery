@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity =0.8.15;
 
-import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IUniswapV3Pool} from "@marginal/v1-core/contracts/interfaces/vendor/kodiak/IUniswapV3Pool.sol";
 
 import {Position as PositionLibrary} from "@marginal/v1-core/contracts/libraries/Position.sol";
 import {OracleLibrary} from "@marginal/v1-core/contracts/libraries/OracleLibrary.sol";

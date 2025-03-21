@@ -4,7 +4,7 @@ pragma solidity =0.8.15;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Multicall} from "@uniswap/v3-periphery/contracts/base/Multicall.sol";
-import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IUniswapV3Pool} from "@marginal/v1-core/contracts/interfaces/vendor/kodiak/IUniswapV3Pool.sol";
 
 import {FixedPoint96} from "@marginal/v1-core/contracts/libraries/FixedPoint96.sol";
 import {FixedPoint192} from "@marginal/v1-core/contracts/libraries/FixedPoint192.sol";

@@ -22,8 +22,8 @@ ethereum:
     default_provider: foundry
 
 foundry:
-  base_fee: 10000000000000  # 10000 gwei
-  priority_fee: 1000000000  # 1 gwei
+  base_fee: 100000000000  # 100 gwei
+  priority_fee: 10000000  # 0.01 gwei
   fork:
     ethereum:
       mainnet:
@@ -41,7 +41,7 @@ dependencies:
     ref: 0.8
   - name: marginal-v1-core
     github: MarginalProtocol/v1-core
-    ref: v1.0.2
+    ref: network/berachain
 
 solidity:
   via_ir: true
@@ -49,4 +49,4 @@ solidity:
     - "@openzeppelin/contracts=openzeppelin/v4.8.3"
     - "@uniswap/v3-core/contracts=uniswap-v3-core/v0.8"
     - "@uniswap/v3-periphery/contracts=uniswap-v3-periphery/v0.8"
-    - "@marginal/v1-core/contracts=marginal-v1-core/v1.0.2"
+    - "@marginal/v1-core/contracts=marginal-v1-core/network/berachain"
